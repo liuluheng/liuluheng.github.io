@@ -1,0 +1,254 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Writing udev rules and kernel examples
+#+OPTIONS: num:nil
+
+* Introduction
+Linux内核2.6之后,由用户空间的工具udev 来提供动态目录 =/dev= 下固定设备
+名的方法. 之前由 /devfs/ 来实现/dev,现在被废除.udev 的原码包和源码文档
+在[[https://www.kernel.org/pub/linux/utils/kernel/hotplug/][kernel/hotplug]] 下.随源码附带的[[http://www.reactivated.net/writing_udev_rules.html][Writing udev rules在这里]].
+
+* The concepts
+*udev* 是管理 /dev 目录的新式方法,被设计出来清理之前/dev 实现的一些问
+题,和提供稳健的向前开发.为了创建并命名系统中相应的/dev 设备节点,udev依
+赖于与 /sysfs/ 提供的信息相匹配的由用户提供的 /rules/.
+
+*sysfs* 是2.6内核的新文件系统.它由内核管理,并导出当前系统插入设备的基
+ 本信息.udev能使用这些信息来创建对应硬件的设备节点.sysfsz挂载在 /sys下
+ 并可浏览.
+
+* Why?
+使用规则它能达到:
+1. 重命名设备节点的缺省名字为其他名字.
+2. 通过创建符号链接到缺省设备节点来提供一个可选的固定的设备节点名字.
+3. 基于程序的输出命名设备节点.
+4. 改变设备节点的权限和所有权.
+5. 但设备节点被创建或删除时(通常是添加设备或拔出设备时)执行一个脚本.
+6. 重命名网络接口.
+* Rule writing
+** Rule files and semantics
+为决定如何命名设备以及执行什么另外动作,udev 会读取一系列规则文件. 这些
+文件保存在 =/etc/udev/rules.d= 目录下,并且都必须以 =.rules= 为后缀.
+
+=/etc/udev/rules.d/= 下面的文件通过 *lexical顺序* 解析,在某些情况下规则的解析
+顺序很重要.所以一般rules文件命名是 =num-xxx.rules= .
+
+在一个rules文件中, 以"#"开头的行被认为是注释. 每一个非空的行都是一条规
+则. 规则不能跨越多行.
+
+一个设备可以被多条规则匹配到, 这有着很实用的优点, 例如, 我们可以写两个
+匹配同一个设备的规则, 每一个规则为设备提供了它自己的可选命名. 即使分开
+在不同的文件种, 两个可选命名也都会被创建, 要明白udev在找到一个匹配规则
+后不会停止处理其他规则, 它仍然会继续查找并尝试应用已知的每条规则, 这很
+重要.
+** Rule syntax
+每条规则通过一系列键值对创建,这些键值对通过 *逗号分隔* . *匹配键* 是用来识别
+要应用规则的设备的条件, 但规则中对应设备的所有匹配键被处理后,就会应用
+规则并且 *赋值键* 的行为也会触发. 每条规则应该包含至少一个匹配键和至少一个
+赋值键.
+
+这是用一个例子规则:
+#+begin_src sh
+  KERNEL=="hdb",NAME="my_spare_disk"
+#+end_src
+上述规则包含一个匹配键(KERNEL)以及一个赋值键(NAME).注意到匹配键通过连
+*等号(==)* 与它的值联系起来,赋值键通过 *等号(=)* 与它的值关联.
+
+注意udev 不支持任何形式的行连接符, 不要在你的规则种插入任何断行符,这将
+会导致udev 把你的一条规则看做是多条规则但不会按预料工作.
+** Basic Rules
+一些常用键,完整的list见[[http://www.freedesktop.org/software/systemd/man/udev.html][udev man page]].
++ KERNEL - 为设备匹配的内核名字.
++ SUBSYSTEM - 匹配设备的子系统.
++ DRIVER - 匹配支持设备的驱动名称.
+
+最基本的赋值键:
++ NAME - 设备节点应该使用的名字.
++ SYMLINK - 一个设备节点可选名字的符号链接列表.
+
++=. 你可以在一个规则中附加多个符号链接到列表中,每个链接通过空格分开.
+
+#+begin_src sh
+ KERNEL=="hdb", NAME="my_spare_disk"
+#+end_src
+匹配一个设备命名为hdb的设备,把它重新命名为my_spare_disk. 设备节点出现
+在/dev/my_spare_disk.
+
+#+begin_src sh
+KERNEL=="hdc", SYMLINK+="cdrom cdrom0"
+#+end_src
+它在/dev/cdrom和/dev/cdrom0创建了两个符号链接,都指向/dev/hdc.没有NAME
+赋值键,所以使用缺省的内核名字(hdc).
+** Matching sysfs attributes
+udev 允许我们使用 =ATTR= 键通过稍微不同的语法来匹配 sysfs 信息到自己的
+规则中.
+
+#+begin_src sh
+SUBSYSTEM=="block", ATTR{size}=="234441648", SYMLINK+="my_disk"
+#+end_src
+** Device hierarchy
+Linux内核实际上以树状结构展示设备, 这个信息通过sysfs显露出来,在书写规
+则时这非常有用. 
+
+udev 提供了在树中向上查找的匹配键变量:
++ KERNELS - 为设备匹配的内核名字,或任何双亲设备中的内核名.
++ SUBSYSTEMS - 匹配设备的子系统名,或任何双亲设备中的子系统名.
++ DRIVERS - 匹配支持设备的驱动名,或任何支持双亲设备的驱动名.
++ ATTRS - 匹配设备的sysfs属性,或任何双亲设备的sysfs属性.
+** String substitutions
+最常用的操作是 =%k= 和 =%n= . =%k= 等同于设备的内核名. =%n= 等同于设备
+内核号.
+
+在规则中匹配字符%, 你必需写成%%,希望匹配字符$, 你必须写成$$.
+
+#+begin_src sh
+KERNEL=="mice", NAME="input/%k"
+KERNEL=="loop0", NAME="loop/%n", SYMLINK+="%k"
+#+end_src
+
++ 第一条规则确保鼠标设备节点一定出现在/dev/input目录下(缺省是在/dev/mice
+下面). 
++ 第二条规则确保名字为loop0的设备节点在/dev/loop/0创建,也会照常创建一
+  个符号链接/dev/loop0.
+** String matching
+
++ * - 匹配任何字符, 匹配0次或多次
++ ? - 匹配任何字符,但只匹配一次.
++ [] - 匹配任何单个字符, 这些字符在方括号里面指定, 范围也是允许的.
+
+#+begin_src sh
+KERNEL=="fd[0-9]*", NAME="floppy/%n", SYMLINK+="%k"
+KERNEL=="hiddev*", NAME="usb/%k"
+#+end_src
+
+* Finding information from sysfs
+** The sysfs tree
+顶层设备路径可以被分类为包含dev文件的sysfs目录, 下列命令可以列举出这些
+文件:
+#+begin_src sh
+# find /sys -name dev
+#+end_src
+
+可以这样读硬盘的大小:
+#+begin_src sh
+# cat /sys/block/sda/size
+234441648
+#+end_src
+在一个udev规则里面, 可以使用ATTR{size}=="234441648"来识别这个磁盘.
+
+** udevadm info
+Ubuntu下提供[[udevadm][udevadm]]工具来察看设备信息,如:
+
+#+begin_src sh
+$ udevadm info  -a -p /sys/block/sda
+  looking at device '/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda':
+    KERNEL=="sda"
+    SUBSYSTEM=="block"
+    DRIVER==""
+    ATTR{range}=="16"
+    ATTR{ext_range}=="256"
+    ATTR{removable}=="0"
+    ATTR{ro}=="0"
+    ATTR{size}=="976773168"
+    ATTR{alignment_offset}=="0"
+    ATTR{discard_alignment}=="0"
+    ATTR{capability}=="50"
+    ATTR{stat}==" 1115589   409173 22216954 10473160   670249   939130 35003688 64945096        0  6941616 75553064"
+    ATTR{inflight}=="       0        0"
+#+end_src
+* Advanced topics
+** Controlling permissions and ownership
+GROUP赋值允许你定义哪个Unix组应该拥有设备节点,定义video组拥有framebuffer设备:
+#+begin_src sh
+KERNEL=="fb[0-9]*", NAME="fb/%n", SYMLINK+="%k", GROUP="video"
+#+end_src
+
+OWNER键允许你定义哪个Unix用户应该具有设备节点的拥有权
+限. 假设有个临时情况要你让join拥有软盘设备,你可以使用:
+#+begin_src sh
+KERNEL=="fd[0-9]*", OWNER="john"
+#+end_src
+
+udev缺省用Unix的0660权限(拥有者和组员拥有读写功能)创建设备节点. 需要的
+话你可以在特定设备的规则中使用包含MODE赋值键覆盖这些缺省值. 下面的规则
+定义了 inotify 节点可以被每个人读写:
+
+#+begin_src sh
+KERNEL=="inotify", NAME="misc/%k", SYMLINK+="%k", MODE="0666"
+#+end_src
+* Testing and debugging
+为使符号链接显示, 你可以断开并重连你的相机或者在非可移除设备情况下运行
+=udevadm test=.
+
+如果你知道sysfs中的顶级设备路径, 你可以使用 =udevadm test= 来显示udev将要执行
+的动作, 这可能会帮你调试你的规则.如想调试作用在/sys/class/sound/dsp上
+的规则:
+#+begin_src sh
+$ udevadm test /class/sound/dsp 
+run_command: calling: test
+adm_test: version 175
+This program is for debugging only, it does not run any program,
+specified by a RUN key. It may show incorrect results, because
+some values may be different, or not available at a simulation run.
+
+parse_file: reading '/etc/udev/rules.d/10-vboxdrv.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-crda.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-fuse.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-gnupg.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-hplip.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-ia64.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-inputattach.rules' as rules file
+parse_file: reading '/lib/udev/rules.d/40-libgphoto2-2.rules' as rules file
+...
+#+end_src
+* kernel examples
+创建设备节点/dev/hello,并创建udev rules来创建它的链接并修改访问权限让
+所有人能直接访问它.整个包源码:[[./Files/hello_dev_and_udev.tar.gz][hello_dev_and_udev.tar.gz]].
+
+#+begin_src sh
+$ make
+$ sudo insmod ./hello_dev.ko
+#now create the /dev/hello
+$ sudo cat /dev/hello
+Hello, world!
+$ cat /dev/hello
+cat: /dev/hello: Permission denied
+$ ls -l /dev/hello
+crw-rw---- 1 root root 10, 61 2007-06-20 14:31 /dev/hello
+#+end_src
+
+创建udev rules:
+#+begin_src sh
+KERNEL=="hello", SYMLINK+="hello_world", MODE="0444"
+#+end_src
+
+#+begin_src sh
+$ sudo cp ./hello.rules /etc/udev/rules.d/051-hello.rules
+$ sudo rmmod hello_dev
+$ sudo insmod ./hello_dev.ko
+$ ls -l /dev/hello*
+cr--r--r-- 1 root root 10, 61 2007-06-19 21:21 /dev/hello
+lrwxrwxrwx 1 root root      5 2007-06-19 21:21 /dev/hello_world -> hello
+$ cat /dev/hello_world
+Hello, world!
+$ cat /dev/hello
+Hello, world!
+#+end_src
+* udevadm in Ubuntu
+<<udevadm>>
+#+begin_src sh
+Usage: udevadm [--help] [--version] [--debug] COMMAND [COMMAND OPTIONS]
+  info         query sysfs or the udev database
+  trigger      request events from the kernel
+  settle       wait for the event queue to finish
+  control      control the udev daemon
+  monitor      listen to kernel and udev events
+  test         test an event run
+  test-builtin test a built-in command
+#+end_src
+
+
+
+
+
+
+
