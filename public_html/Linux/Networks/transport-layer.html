@@ -1,0 +1,1487 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Transport layer</title>
+<!-- 2014-11-25 Tue 20:31 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Transport layer</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">UDP</a></li>
+<li><a href="#sec-2">TCP</a>
+<ul>
+<li><a href="#sec-2-1">TCP Headers</a></li>
+<li><a href="#sec-2-2">Receiving TCP Data</a></li>
+<li><a href="#sec-2-3">Three-Way Handshake</a></li>
+<li><a href="#sec-2-4">Passive Connection Establishment</a></li>
+<li><a href="#sec-2-5">Active Connection Establishment</a></li>
+<li><a href="#sec-2-6">Transmission of Data Packets</a></li>
+<li><a href="#sec-2-7">Connection Termination</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">reference</a>
+<ul>
+<li><a href="#sec-3-1"><code>__udp4_lib_rcv</code></a></li>
+<li><a href="#sec-3-2"><code>sock_queue_rcv_skb</code></a></li>
+<li><a href="#sec-3-3"><code>tcp_v4_connect</code></a></li>
+<li><a href="#sec-3-4"><code>tcp_connect</code></a></li>
+<li><a href="#sec-3-5"><code>tcp_sendmsg</code></a></li>
+<li><a href="#sec-3-6"><code>tcp_close</code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">UDP</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+在<a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/network-layer.html">Network layer中</a>,  <code>ip_local_deliver</code> 把IP包发送往 transport layer.
+<code>net/ipv4/udp.c</code> 中的  <code>udp_rcv</code> 进一步处理 UDP 数据报文包.相应的代码流程如下.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/udp-rcv.jpeg" alt="udp-rcv.jpeg" />
+</p>
+</div>
+
+<p>
+<code>udp_rcv</code> 函数仅仅是 <code>__udp4_lib_rcv</code> 的一个封装,因为这代码与RFC3828中定义的UDP-lite协议的实现所共享.
+</p>
+
+<p>
+和其他协议层一样,函数的输入参数是socket buffer.一旦到这数据包是完整,需要使用 <code>__udp4_lib_lookup</code> 找到侦听socket.链路参数能从UDP头中获取,它的结果如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/udp-structure.jpeg" alt="udp-structure.jpeg" />
+</p>
+</div>
+
+<ul class="org-ul">
+<li>‘‘Source’’ 和 ‘‘Destination Port’’指定端口号,可接受的值从0
+到65.535(因为使用16字节.
+</li>
+<li>‘‘Length’是字节数总的长度(头部和数据).
+</li>
+</ul>
+
+<p>
+UDP 包头在kernel中如下数据结构:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udphdr</span> {
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">source</span>;
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">dest</span>;
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">len</span>;
+        <span style="color: #98fb98;">__sum16</span> <span style="color: #eedd82;">check</span>;
+};
+</pre>
+</div>
+
+<p>
+<code>net/ipv4/udp.c</code> 中的 <code>__udp4_lib_lookup</code> 使用来寻找这个包将要发送的
+kernel内部的socket.当有侦听进程接受此包,代码使用hash方法从全局hash表
+<code>udphash</code> 中找到 <code>sock</code> 结构的实例.如果不能找到相应的socket,它将发送一个 <i>destination unreachable</i> 信息给原系统,然后此包被丢弃.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
+</pre>
+</div>
+
+<p>
+这里需要 <code>sock</code> 结构来把transport层的数据传递到用户层应用程序,实际上,
+在kernel中有2个数据结构来表示socket. <code>sock</code> 是network access layer的接口,而 <code>socket</code> 是用户空间的链接点.这两个结构在之后<a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/application-layer.html">Application Layer</a>分析.在此,我们感兴趣的是 <code>sock</code> 结构中用来传递数据到上层的方法.这需要允许收到的数据被放到一个socket指定的等待队列中,并且通知接收进程有新的数据到达.现在, <code>sock</code> 结构能缩略到如下简化版:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">include/net/sock.h</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Short version </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> {
+  <span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">sk_sleep</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff_head</span> <span style="color: #eedd82;">sk_receive_queue</span>;
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Callback </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">sk_data_ready</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">bytes</span>);
+}
+</pre>
+</div>
+
+<p>
+<code>udp_rcv</code> 找到相应的 <code>sock</code> 实例后,进入函数 <code>udp_queue_rcv_skb</code>, 调用
+<code>__udp_queue_rcv_skb</code> ,最后进入 <code>sock_queue_rcv_skb</code> 中,把包放入等待队列.重要的流程如下:
+</p>
+<ol class="org-ol">
+<li>等待数据到达的进程通过socket sleep对其等待队列sleep.
+</li>
+<li>调用 <code>skb_queue_tail</code> 把socket buffer包插入到 <code>receive_queue</code> list
+的最后,这个list头在 <code>sock</code> 结构中.
+</li>
+<li><code>sk_data_ready</code> 指向的函数被调用来通知socket有新的数据到达.它唤醒等待此队列的所有sleep的进程.
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">TCP</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+相对UDP,TCP提供更多功能.因此,它在kernel中的实现比较困难和复杂.谈及细节问题可以占用整本书.面向连接的TCP通信模型支持安全数据流传输不仅在kernel
+中需要更强的管理复杂,同时也需要进一步的操作,比如明示的连接创建通过设备间的握手.
+</p>
+
+<p>
+这里主要分析TCP协议的3个主要部分:连接建立,传送/发送包和连接终止.
+</p>
+
+<p>
+TCP连接处于一个定义好的状态.所有状态和它们之间转换的规则如下:
+</p>
+
+<p>
+<a id="tcp-transition" name="tcp-transition"></a>
+<img src="./Files/tcp-state-transition.jpeg" alt="tcp-state-transition.jpeg" />
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">TCP Headers</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+TCP的头部如下图:
+<i>
+./Files/tcp-packet.jpeg</i>
+</p>
+
+<ul class="org-ul">
+<li>source和dest指定使用的端口号.
+</li>
+<li>seq是序列号.指定TCP包在数据流中所处位置.
+</li>
+<li>ack<sub>seq是确认序列号</sub>.
+</li>
+<li>doff是data offset的缩小,指定TCP头结构的长度.
+</li>
+<li>urg(urgent), ack(acknowledgment), psh(push), rst(reset),
+syn(synchronize), 和fin是控制标识来检查,建立和终止连接.
+</li>
+<li>window告诉连接同伴在接收缓冲将满前它能发送多少字节.
+</li>
+<li>options是长度的其他附加选项.
+</li>
+<li>数据起始点是一个32-bit的位置.
+</li>
+</ul>
+
+<p>
+头部以 <code>tcphadr</code> 结构实现,如下:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;tcp.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcphdr</span> {
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">source</span>;
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">dest</span>;
+        <span style="color: #98fb98;">__be32</span>  <span style="color: #eedd82;">seq</span>;
+        <span style="color: #98fb98;">__be32</span>  <span style="color: #eedd82;">ack_seq</span>;
+<span style="color: #b0c4de;">#if</span> <span style="color: #b0c4de;">defined</span>(__LITTLE_ENDIAN_BITFIELD)
+        <span style="color: #98fb98;">__u16</span>   <span style="color: #eedd82;">res1</span>:4,
+                <span style="color: #eedd82;">doff</span>:4,
+                <span style="color: #eedd82;">fin</span>:1,
+                <span style="color: #eedd82;">syn</span>:1,
+                <span style="color: #eedd82;">rst</span>:1,
+                <span style="color: #eedd82;">psh</span>:1,
+                <span style="color: #eedd82;">ack</span>:1,
+                <span style="color: #eedd82;">urg</span>:1,
+                <span style="color: #eedd82;">ece</span>:1,
+                <span style="color: #eedd82;">cwr</span>:1;
+<span style="color: #b0c4de;">#elif</span> <span style="color: #b0c4de;">defined</span>(__BIG_ENDIAN_BITFIELD)
+        <span style="color: #98fb98;">__u16</span>   <span style="color: #eedd82;">doff</span>:4,
+                <span style="color: #eedd82;">res1</span>:4,
+                <span style="color: #eedd82;">cwr</span>:1,
+                <span style="color: #eedd82;">ece</span>:1,
+                <span style="color: #eedd82;">urg</span>:1,
+                <span style="color: #eedd82;">ack</span>:1,
+                <span style="color: #eedd82;">psh</span>:1,
+                <span style="color: #eedd82;">rst</span>:1,
+                <span style="color: #eedd82;">syn</span>:1,
+                <span style="color: #eedd82;">fin</span>:1;
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#error</span>  <span style="color: #ffa07a;">"Adjust your &lt;asm/byteorder.h&gt; defines"</span>
+<span style="color: #b0c4de;">#endif</span>  
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">window</span>;
+        <span style="color: #98fb98;">__sum16</span> <span style="color: #eedd82;">check</span>;
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">urg_ptr</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Receiving TCP Data</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+所有TCP行为(连接建立,关闭和数据传输)都通过发送拥有特定属性和不同标识的数据包.在讨论状态转换前,先分析TCP数据如何传递到transport layer和头部在那裏被分析.
+</p>
+
+<p>
+<code>tcp_v4_rcv</code> 是被IP层处理完的包传入到TCP层的入口点.流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-v4-rcv.jpeg" alt="tcp-v4-rcv.jpeg" />
+</p>
+</div>
+
+<p>
+每个TCP socket在以下3个hash表之一中:
+</p>
+<ul class="org-ul">
+<li>完全连接的Sockets.
+</li>
+<li>等待连接(listen状态)的Sockets.
+</li>
+<li>正在建立连接(3次握手)的Sockets.
+</li>
+</ul>
+
+<p>
+做做完对数据包的一些检查,并拷贝一些头信息到控制模块后,kernel找寻正在等待处理此包的socket通过函数 <code>__inet_lookup</code> .这个函数进一步调用两个函数来检查不同的hash表. <code>__inet_lookup_established</code> 试图返回一个连接好的
+socket. 如果没有找到, <code>__inet_lookup_listener</code> 被调用来检查所有侦听中的sockets.
+</p>
+
+<p>
+两个函数都把连接的不同元素和起来计算hash值来找到对应的sock.当搜索侦听
+socket时,一个score的方法被使用来找到最合适的候选sockets.
+</p>
+
+<p>
+与UDP不同,当合适的sock结构找到工作并不完结.依赖于所处连接状态,有必要做如上图的状态转换. <code>tcp_v4_do_rcv</code> 好比一个分路器,把代码路径基于socket
+站柜台分成不同的分支.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Three-Way Handshake</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+在TCP链路能被使用前,client和host之间必须建立连接.有两种不同的连接建立方式: active和passive.
+</p>
+
+<p>
+在建立连接前,client的socket处于CLOSED状态,而server的socket处理LISTEN状态.
+</p>
+
+<p>
+TCP 连接的建立过程通过交互3个TCP包完成,所以被熟知为"3次握手".如
+<a href="#tcp-transition">TCP状态图</a>所示,如下的行为进行:
+</p>
+<ol class="org-ol">
+<li>client发送SYN包给server告诉连接请求.client的socket状态从CLOSED转换到SYN<sub>SENT</sub>.
+</li>
+<li>server在侦听中的socket收到连接请求,然后返回SYN和ACK的包. server的
+socket状态从LISTEN转换到SYN<sub>REC</sub>.
+</li>
+<li>client的socket收到SYN/ACK包并转换到ESTABLISHED状态,表明连接已经建立.一个ACK包发给server.
+</li>
+<li>server收到ACK包并转换到ESTABLISHED状态.两端的连接创建好,数据交互可以开始.
+</li>
+</ol>
+
+<p>
+每个发送包都被赋予一个序列号,并且每个包的收到必须由接收方确认.如下一个连接请求的例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">1 192.168.0.143 192.168.1.10 TCP 1025 &gt; http [SYN] <span style="color: #eedd82;">Seq</span>=2895263889 <span style="color: #eedd82;">Ack</span>=0
+2 192.168.1.10 192.168.0.143 TCP http &gt; 1025 [SYN, ACK] <span style="color: #eedd82;">Seq</span>=2882478813 <span style="color: #eedd82;">Ack</span>=289526
+3 192.168.0.143 192.168.1.10 TCP 1025 &gt; http [ACK] <span style="color: #eedd82;">Seq</span>=2895263890 <span style="color: #eedd82;">Ack</span>=2882478814
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">Passive Connection Establishment</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+主动建立连接不是由kernel自己发出,而是通过收到连接请求的SYN包所触发.因此起始点是接收函数 <code>tcp_v4_rcv</code> ,如上节所述,此函数找到侦听socket并调用
+<code>tcp_v4_do_rcv</code>, 它的代码流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-v4-rcv-passive.jpeg" alt="tcp-v4-rcv-passive.jpeg" />
+</p>
+</div>
+
+<p>
+<code>tcp_v4_hnd_req</code> 被调用来进行网络层创建新连接所需要的一些初始化工作.实际的状态转换在 <code>tcp_rcv_state_process</code> ,其中包含一长串case语句区分可能的socket状态,并触发合适的转换函数.
+</p>
+
+<p>
+socket状态定义如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">include/net/tcp_states.h</span>
+<span style="color: #00ffff;">enum</span> {
+  <span style="color: #eedd82;">TCP_ESTABLISHED</span> = 1,
+  <span style="color: #98fb98;">TCP_SYN_SENT</span>,
+  <span style="color: #98fb98;">TCP_SYN_RECV</span>,
+  <span style="color: #98fb98;">TCP_FIN_WAIT1</span>,
+  <span style="color: #98fb98;">TCP_FIN_WAIT2</span>,
+  <span style="color: #98fb98;">TCP_TIME_WAIT</span>,
+  <span style="color: #98fb98;">TCP_CLOSE</span>,
+  <span style="color: #98fb98;">TCP_CLOSE_WAIT</span>,
+  <span style="color: #98fb98;">TCP_LAST_ACK</span>,
+  <span style="color: #98fb98;">TCP_LISTEN</span>,
+  <span style="color: #98fb98;">TCP_CLOSING</span>, <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Now a valid state </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #eedd82;">TCP_MAX_STATES</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Leave at the end! </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+</div>
+
+<p>
+如果socket状态处于 <code>TCP_LISTEN</code> 时, 调用
+<code>icsk-&gt;icsk_af_ops-&gt;conn_request(sk, skb)</code> , IPv4时指向
+<code>tcp_v4_conn_request</code> 而IPv6时指向 <code>tcp_v6_conn_request</code> .不进一步分析这个函数,重要的是在此函数最后确认包被发送.第一次握手成功.
+</p>
+
+<p>
+之后client接收到这个ACK包从通常路径 <code>tcp_rcv_state_process</code> , socket此时状态是 <code>TCP_SYN_RECV</code> ,此时kernel主要任务是转换socket状态到
+<code>TCP_ESTABLISHED</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">Active Connection Establishment</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+主动建立连接由用户空间应用调用库函数 <code>connect</code> ,然后通过 <code>socketcall</code>
+的系统调用到达kernel函数 <code>tcp_v4_connec</code>, 它的代码流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-active-connection-establish.jpeg" alt="tcp-active-connection-establish.jpeg" />
+</p>
+</div>
+
+<p>
+函数开始于寻找到目的host的IP路由通过kernel提供的路由功能,当TCP头部被创建并设置相应的值在socket buffer中后, <code>tcp_set_state(sk,
+TCP_SYN_SENT);</code> ,socket状态从 <code>CLOSED</code> 转换到 <code>SYN_SENT</code>. 然后
+<code>tcp_connect</code> 发送 SYN包到IP层从而到达client( <code>tcp_transmit_skb(sk,
+buff, 1, sk-&gt;sk_allocation);</code> ). 并且 <code>inet_csk_reset_xmit_timer</code> 创建一个计时器确保能重发包如果在一段时间内没有收到确认包.
+</p>
+
+<p>
+现在client必须等到server确认SYN包的收到和确认连接请求的SYN包. 与通常的
+TCP接收路径一样,之后到达 <code>tcp_rcv_state_process</code> 分状态处理,这里到
+<code>tcp_rcv_synsent_state_process</code> 去处理. socket状态设置为 <code>ESTABLISHED</code>
+,并且 <code>tcp_send_ack</code> 发送另外ACK包给server完成建立连接.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-6" class="outline-3">
+<h3 id="sec-2-6">Transmission of Data Packets</h3>
+<div class="outline-text-3" id="text-2-6">
+<p>
+一旦连接建立好,数据就在设备间传递.但这个过程还是有点难处理的,因为TCP有如下一些要求:
+</p>
+<ul class="org-ul">
+<li>字节流以一定顺序传递.
+</li>
+<li>丢失的包自动重传.
+</li>
+<li>数据流在各方向上独立控制并与主机速度匹配.
+</li>
+</ul>
+
+<p>
+包的确认基于序列号.那么序列号是如何被设置的?当一个连接建立,一个随机数产生, 使用 <code>drivers/char/random.c</code> 中的 <code>secure_tcp_sequence_number</code>
+。
+</p>
+
+<p>
+TCP使用累积确认机制.这意味着一个确认涵盖连续的整个范围的字节.这个ACK数字确认收到所有数据到并包含比这个数字少1的字节.这个数字也表明下一个预期的序列号.
+</p>
+
+<p>
+这个机制是用来追踪丢失的包.TCP使用直接的重发机制,也就是,接收端不能要求发送端重发丢失的包.责任就由发送短自动重发丢失的数据段,如果它在一段时间内没有收到确认包.
+</p>
+
+<p>
+那么这些过程如何在kernel中实现的了?这里认为连接已经建立,两端都处于
+ESTABLISHED状态.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-2-6-1" name="sec-2-6-1"></a>Receiving Packets<br  /><div class="outline-text-4" id="text-2-6-1">
+<p>
+收包代码流程如下图,还是从 <code>tcp_v4_rcv</code> 开始,当包收到.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-v4-rcv-connection.jpeg" alt="tcp-v4-rcv-connection.jpeg" />
+</p>
+</div>
+
+<p>
+到达 <code>tcp_v4_do_rcv</code> 后, 如果连接已经建立,一条快速路径被选择,而不是进入核心状态转换函数,这个与其他状态不同,因为传送数据包是TCP中大部分的工作,必须尽量的快.进入快速路径调用 <code>tcp_rcv_established</code>, 这里会分析包的选项,是否容易解析,容易就进入快速路径稍微处理下就调用
+<code>sk-&gt;sk_data_ready</code> 交给socket. 否则进入慢速路径,进一步处理之后再交给
+socket.
+</p>
+
+<p>
+包必须满足如下条件之一才能被分类为容易解析:
+</p>
+<ul class="org-ul">
+<li>包只包含对上次发送数据的确认信息. <i>make package/atheros-9.2/{clean,prepare,compile,install} V=99</i> 
+</li>
+<li>数据必须包含下次希望收到的数据.
+</li>
+</ul>
+<p>
+并且,如下标示都不能被设置: SYN, URG, RST, 或 FIN.因为大部分包属于此类,
+所以分为快速和慢速路径是有意义的.
+</p>
+
+
+<p>
+快速路径的主要操作:
+</p>
+<ol class="org-ol">
+<li>对包做一些检查,如果属于复杂包,那就把它们放入慢速路径.
+</li>
+<li>通过包的长度判断是确认包还是数据包.不难判断,因为确认包不包含数据,长度正好是TCP包头长度.
+</li>
+<li>把确认包由 <code>tcp_ack</code> 处理,这个函数先过滤掉不正确的包.最重要的任务不是分析信息,而是从重传队列中删除确认过的数据包.
+</li>
+<li>快速路径直接处理与之前分片连续的收到数据,这个数据包能被确认通过发送
+ACK包给发送者,并不需要进一步的再检查.最后 <code>sk_data_read</code> 函数通知用户层有新数据要处理.
+</li>
+</ol>
+
+<p>
+快速和慢速路径的区别呢?因为TCP有许多的选项,慢速路径的代码更具广泛性.在慢速路径中,数据不能直接发给socket,因为复杂的包选项检查需要进行,然后这些可能引起TCP子系统进一步处理.以乱序到达的数据包将被放在一个特殊的等待队列中,直到一个完整的包完成.
+</p>
+</div>
+</li>
+
+<li><a id="sec-2-6-2" name="sec-2-6-2"></a>Sending Packets<br  /><div class="outline-text-4" id="text-2-6-2">
+<p>
+TCP包发送以函数 <code>tcp_sendmsg</code> 开始,相应的代码流程如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-sendmsg.jpeg" alt="tcp-sendmsg.jpeg" />
+</p>
+</div>
+
+<p>
+socket的状态在数据发送开始前必然是 <code>TCP_ESTABLISHED</code> , 如果不是,
+kernel等待直到连接被建立.然后,数据从用户空间拷贝过来构建TCP包.然而发送
+TCP包不仅仅如UDP一般简单的构建包头然后传递到IP层.它同时必须考虑如下要求:
+</p>
+<ul class="org-ul">
+<li>接收端的等待队列有足够的空间容纳此数据.
+</li>
+<li>ECN机制必须实现来防止连接拥塞.
+</li>
+<li>TCP slow-start机制要求慢慢增加包大小从通信开始.
+</li>
+<li>发送但为确认的包必须重传在一定的时间后,直到它们最终被接收端确认.
+</li>
+</ul>
+
+<p>
+重发队列是TCP连接稳定数据发送的关键.稍微分析一下它.包被组装好后,kernel
+到达函数 <code>tcp_push_one</code>, 它主要完成如下3个任务:
+</p>
+<ul class="org-ul">
+<li>先做一些congestion window之类的检查,确认当前能发送此包.
+</li>
+<li><code>tcp_transmit_skb</code> 把包发往IP层使用协议特定的函数指针
+<code>icsk-&gt;icsk_af_ops-&gt;queue_xmit</code> .(IPv4使用 <code>ip_queue_xmit</code> )
+</li>
+<li><code>tcp_event_new_data_sent</code> 充值重传计时器.
+</li>
+</ul>
+
+<p>
+与特定socket相关联的sock实例为每个发送的包维护一组重传计数器.kernel使用的超时函数是 <code>tcp_write_timer</code>, 它调用 <code>tcp_retransmit_timer</code> 如果
+ACK没有收到. 
+</p>
+
+<p>
+当重传时,如下需要注意:
+</p>
+<ul class="org-ul">
+<li>连接可能已经被关闭.存储的包和计数器从kernel内存中移除.
+</li>
+<li>当重传次数超过 <code>sysctl_tcp_retries2</code>,重传被剔除.
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-2-7" class="outline-3">
+<h3 id="sec-2-7">Connection Termination</h3>
+<div class="outline-text-3" id="text-2-7">
+<p>
+同连接建立一样,TCP的关闭也是通过多此交换包,如图<a href="#tcp-transition">TCP状态转换图</a>.一个连接可以如下两种方式关闭:
+</p>
+<ol class="org-ol">
+<li>以其中之一系统的明示请求来终止连接.
+</li>
+<li>终止或打断被更高的协议(比如程序崩溃等).
+</li>
+</ol>
+
+<p>
+这里分析第一中情况.TCP参与者必须交换4个包来得体的关闭连接.步骤如下:
+</p>
+<ol class="org-ol">
+<li>在设备A调用库函数 <code>close</code> 来发送一个TCP包,其中设置FIN标志位在头部.A
+的socket转换到 <code>FIN_WAIT_1</code> 状态.
+</li>
+<li>设备B收到FIN包并返回ACK包.它的socket状态从 <code>ESTABLISHED</code> 转换到
+<code>CLOSE_WAIT</code>.
+</li>
+<li>收到ACK包后,设备A的socket状态从 <code>FIN_WAIT_1</code> 转换到 <code>FIN_WAIT_2</code>.
+</li>
+<li>设备B的socket也执行 <code>close</code> 来发送FIN包到A.设备B的socket状态转换到
+<code>LAST_ACK</code>.
+</li>
+<li>设备A发送ACK包确认收到FIN包,先到 <code>TIME_WAIT</code> 状态,并过段时间自动转换到 <code>CLOSED</code> 状态.
+</li>
+<li>设备B收到ACK包,触使它socket状态转换到 <code>CLOSED</code> 状态.
+</li>
+</ol>
+
+<p>
+当调用库函数 <code>close</code> 来关闭连接, <code>tcp_close</code> 函数被调用.如果socket的状态是 <code>LISTEN</code>,那么很简单,把状态设置为 <code>CLOSED</code>. 因为外部没有设备需要被通知连接的结束.
+</p>
+
+<p>
+如果不是 <code>LISTEN</code> 状态, <code>tcp_send_fin</code> 发送一个FIN给对方,并通过调用
+<code>tcp_close_state</code> 和 <code>tcp_set_state</code> 来把状态设置为 <code>FIN_WAIT_1</code>.
+</p>
+
+<p>
+从 <code>FIN_WAIT_1</code> 到 <code>FIN_WAIT_2</code> 的转换由中心分流函数
+<code>tcp_rcv_state_process</code> 完成. 当收到ACK包同过调用 <code>tcp_set_state</code> 来转换状态到 <code>FIN_WAIT_2</code> .只要在收到对方的FIN包,它就转到 <code>TIME_WAIT</code>,并过段时间自动到 <code>CLOSED</code> 状态.
+</p>
+
+<p>
+收到FIN包的对方设备已类似流程关闭.当它处于 <code>ESTABLISHED</code> 时收到第一个
+FIN包,在 <code>tcp_rcv_established</code> 中的慢速路径得到处理,发送ACK包,并转换
+socket状态到 <code>CLOSE_WAIT</code>. 
+</p>
+
+<p>
+之后状态转换到 <code>LAST_ACK</code> 通过调用 <code>close</code> 库函数来触发kernel中的
+<code>tcp_close_state</code> 函数.只要进一步的一个来自对方的ACK包来关闭连接.这个
+ACK包通过 <code>tcp_rcv_state_process</code> 函数处理,把socket状态转到 <code>CLOSED</code>
+通过 <code>tcp_done</code>.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">reference</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1"><code>__udp4_lib_rcv</code></h3>
+<div class="outline-text-3" id="text-3-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__udp4_lib_rcv</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udp_table</span> *<span style="color: #eedd82;">udptable</span>,
+                   <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">proto</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udphdr</span> *<span style="color: #eedd82;">uh</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">ulen</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rtable</span> *<span style="color: #eedd82;">rt</span> = skb_rtable(skb);
+        <span style="color: #98fb98;">__be32</span> <span style="color: #eedd82;">saddr</span>, <span style="color: #eedd82;">daddr</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net</span> *<span style="color: #eedd82;">net</span> = dev_net(skb-&gt;dev);
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         *  Validate the packet.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (!pskb_may_pull(skb, <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udphdr</span>)))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">drop</span>;              <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No space for header. </span><span style="color: #ff7f24;">*/</span>
+
+        uh   = udp_hdr(skb);
+        ulen = ntohs(uh-&gt;len);
+        saddr = ip_hdr(skb)-&gt;saddr;
+        daddr = ip_hdr(skb)-&gt;daddr;
+
+        <span style="color: #00ffff;">if</span> (ulen &gt; skb-&gt;len)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">short_packet</span>;
+
+        <span style="color: #00ffff;">if</span> (proto == IPPROTO_UDP) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">UDP validates ulen. </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (ulen &lt; <span style="color: #00ffff;">sizeof</span>(*uh) || pskb_trim_rcsum(skb, ulen))
+                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">short_packet</span>;
+                uh = udp_hdr(skb);
+        }
+
+        <span style="color: #00ffff;">if</span> (udp4_csum_init(skb, uh, proto))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">csum_error</span>;
+
+        <span style="color: #00ffff;">if</span> (rt-&gt;rt_flags &amp; (RTCF_BROADCAST|RTCF_MULTICAST))
+                <span style="color: #00ffff;">return</span> __udp4_lib_mcast_deliver(net, skb, uh,
+                                saddr, daddr, udptable);
+
+        sk = __udp4_lib_lookup_skb(skb, uh-&gt;source, uh-&gt;dest, udptable);
+
+        <span style="color: #00ffff;">if</span> (sk != <span style="color: #7fffd4;">NULL</span>) {
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ret</span> = udp_queue_rcv_skb(sk, skb);
+                sock_put(sk);
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">a return value &gt; 0 means to resubmit the input, but</span>
+<span style="color: #ff7f24;">                 * it wants the return to be -protocol, or 0</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (ret &gt; 0)
+                        <span style="color: #00ffff;">return</span> -ret;
+                <span style="color: #00ffff;">return</span> 0;
+        }
+
+        <span style="color: #00ffff;">if</span> (!xfrm4_policy_check(<span style="color: #7fffd4;">NULL</span>, XFRM_POLICY_IN, skb))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">drop</span>;
+        nf_reset(skb);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No socket. Drop packet silently, if checksum is wrong </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (udp_lib_checksum_complete(skb))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">csum_error</span>;
+
+        UDP_INC_STATS_BH(net, UDP_MIB_NOPORTS, proto == IPPROTO_UDPLITE);
+        icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Hmm.  We got an UDP packet to a port to which we</span>
+<span style="color: #ff7f24;">         * don't wanna listen.  Ignore it.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        kfree_skb(skb);
+        <span style="color: #00ffff;">return</span> 0;
+
+<span style="color: #7fffd4;">short_packet</span>:
+        LIMIT_NETDEBUG(KERN_DEBUG <span style="color: #ffa07a;">"UDP%s: short packet: From %pI4:%u %d/%d to %pI4:%u\n"</span>,
+                       proto == IPPROTO_UDPLITE ? <span style="color: #ffa07a;">"-Lite"</span> : <span style="color: #ffa07a;">""</span>,
+                       &amp;saddr,
+                       ntohs(uh-&gt;source),
+                       ulen,
+                       skb-&gt;len,
+                       &amp;daddr,
+                       ntohs(uh-&gt;dest));
+        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">drop</span>;
+
+<span style="color: #7fffd4;">csum_error</span>:
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * RFC1122: OK.  Discards the bad packet silently (as far as</span>
+<span style="color: #ff7f24;">         * the network is concerned, anyway) as per 4.1.3.4 (MUST).</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        LIMIT_NETDEBUG(KERN_DEBUG <span style="color: #ffa07a;">"UDP%s: bad checksum. From %pI4:%u to %pI4:%u ulen %d\n"</span>,
+                       proto == IPPROTO_UDPLITE ? <span style="color: #ffa07a;">"-Lite"</span> : <span style="color: #ffa07a;">""</span>,
+                       &amp;saddr,
+                       ntohs(uh-&gt;source),
+                       &amp;daddr,
+                       ntohs(uh-&gt;dest),
+                       ulen);
+<span style="color: #7fffd4;">drop</span>:
+        UDP_INC_STATS_BH(net, UDP_MIB_INERRORS, proto == IPPROTO_UDPLITE);
+        kfree_skb(skb);
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2"><code>sock_queue_rcv_skb</code></h3>
+<div class="outline-text-3" id="text-3-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">sock_queue_rcv_skb</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span> = 0;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">skb_len</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Cast sk-&gt;rcvbuf to unsigned... It's pointless, but reduces</span>
+<span style="color: #ff7f24;">           number of warnings when compiling with -W --ANK</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (atomic_read(&amp;sk-&gt;sk_rmem_alloc) + skb-&gt;truesize &gt;=
+            (<span style="color: #98fb98;">unsigned</span>)sk-&gt;sk_rcvbuf) {
+                err = -ENOMEM;
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+        }
+
+        err = sk_filter(sk, skb);
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+
+        <span style="color: #00ffff;">if</span> (!sk_rmem_schedule(sk, skb-&gt;truesize)) {
+                err = -ENOBUFS;
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+        }
+
+        skb-&gt;dev = <span style="color: #7fffd4;">NULL</span>;
+        skb_set_owner_r(skb, sk);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Cache the SKB length before we tack it onto the receive</span>
+<span style="color: #ff7f24;">         * queue.  Once it is added it no longer belongs to us and</span>
+<span style="color: #ff7f24;">         * may be freed by other threads of control pulling packets</span>
+<span style="color: #ff7f24;">         * from the queue.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        skb_len = skb-&gt;len;
+
+        skb_queue_tail(&amp;sk-&gt;sk_receive_queue, skb);
+
+        <span style="color: #00ffff;">if</span> (!sock_flag(sk, SOCK_DEAD))
+                sk-&gt;sk_data_ready(sk, skb_len);
+<span style="color: #7fffd4;">out</span>:
+        <span style="color: #00ffff;">return</span> err;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3"><code>tcp_v4_connect</code></h3>
+<div class="outline-text-3" id="text-3-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tcp_v4_connect</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr</span> *<span style="color: #eedd82;">uaddr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">addr_len</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_sock</span> *<span style="color: #eedd82;">inet</span> = inet_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_sock</span> *<span style="color: #eedd82;">tp</span> = tcp_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_in</span> *<span style="color: #eedd82;">usin</span> = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_in</span> *)uaddr;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rtable</span> *<span style="color: #eedd82;">rt</span>;
+        <span style="color: #98fb98;">__be32</span> <span style="color: #eedd82;">daddr</span>, <span style="color: #eedd82;">nexthop</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">tmp</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span>;
+
+        <span style="color: #00ffff;">if</span> (addr_len &lt; <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_in</span>))
+                <span style="color: #00ffff;">return</span> -EINVAL;
+
+        <span style="color: #00ffff;">if</span> (usin-&gt;sin_family != AF_INET)
+                <span style="color: #00ffff;">return</span> -EAFNOSUPPORT;
+
+        nexthop = daddr = usin-&gt;sin_addr.s_addr;
+        <span style="color: #00ffff;">if</span> (inet-&gt;opt &amp;&amp; inet-&gt;opt-&gt;srr) {
+                <span style="color: #00ffff;">if</span> (!daddr)
+                        <span style="color: #00ffff;">return</span> -EINVAL;
+                nexthop = inet-&gt;opt-&gt;faddr;
+        }
+
+        tmp = ip_route_connect(&amp;rt, nexthop, inet-&gt;saddr,
+                               RT_CONN_FLAGS(sk), sk-&gt;sk_bound_dev_if,
+                               IPPROTO_TCP,
+                               inet-&gt;sport, usin-&gt;sin_port, sk, 1);
+        <span style="color: #00ffff;">if</span> (tmp &lt; 0) {
+                <span style="color: #00ffff;">if</span> (tmp == -ENETUNREACH)
+                        IP_INC_STATS_BH(sock_net(sk), IPSTATS_MIB_OUTNOROUTES);
+                <span style="color: #00ffff;">return</span> tmp;
+        }
+
+        <span style="color: #00ffff;">if</span> (rt-&gt;rt_flags &amp; (RTCF_MULTICAST | RTCF_BROADCAST)) {
+                ip_rt_put(rt);
+                <span style="color: #00ffff;">return</span> -ENETUNREACH;
+        }
+
+        <span style="color: #00ffff;">if</span> (!inet-&gt;opt || !inet-&gt;opt-&gt;srr)
+                daddr = rt-&gt;rt_dst;
+
+        <span style="color: #00ffff;">if</span> (!inet-&gt;saddr)
+                inet-&gt;saddr = rt-&gt;rt_src;
+        inet-&gt;rcv_saddr = inet-&gt;saddr;
+
+        <span style="color: #00ffff;">if</span> (tp-&gt;rx_opt.ts_recent_stamp &amp;&amp; inet-&gt;daddr != daddr) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Reset inherited state </span><span style="color: #ff7f24;">*/</span>
+                tp-&gt;rx_opt.ts_recent       = 0;
+                tp-&gt;rx_opt.ts_recent_stamp = 0;
+                tp-&gt;write_seq              = 0;
+        }
+
+        <span style="color: #00ffff;">if</span> (tcp_death_row.sysctl_tw_recycle &amp;&amp;
+            !tp-&gt;rx_opt.ts_recent_stamp &amp;&amp; rt-&gt;rt_dst == daddr) {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_peer</span> *<span style="color: #eedd82;">peer</span> = rt_get_peer(rt);
+                <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                 * VJ's idea. We save last timestamp seen from</span>
+<span style="color: #ff7f24;">                 * the destination in peer table, when entering state</span>
+<span style="color: #ff7f24;">                 * TIME-WAIT * and initialize rx_opt.ts_recent from it,</span>
+<span style="color: #ff7f24;">                 * when trying new connection.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (peer != <span style="color: #7fffd4;">NULL</span> &amp;&amp;
+                    peer-&gt;tcp_ts_stamp + TCP_PAWS_MSL &gt;= get_seconds()) {
+                        tp-&gt;rx_opt.ts_recent_stamp = peer-&gt;tcp_ts_stamp;
+                        tp-&gt;rx_opt.ts_recent = peer-&gt;tcp_ts;
+                }
+        }
+
+        inet-&gt;dport = usin-&gt;sin_port;
+        inet-&gt;daddr = daddr;
+
+        inet_csk(sk)-&gt;icsk_ext_hdr_len = 0;
+        <span style="color: #00ffff;">if</span> (inet-&gt;opt)
+                inet_csk(sk)-&gt;icsk_ext_hdr_len = inet-&gt;opt-&gt;optlen;
+
+        tp-&gt;rx_opt.mss_clamp = 536;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Socket identity is still unknown (sport may be zero).</span>
+<span style="color: #ff7f24;">         * However we set state to SYN-SENT and not releasing socket</span>
+<span style="color: #ff7f24;">         * lock select source port, enter ourselves into the hash tables and</span>
+<span style="color: #ff7f24;">         * complete initialization after this.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        tcp_set_state(sk, TCP_SYN_SENT);
+        err = inet_hash_connect(&amp;tcp_death_row, sk);
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failure</span>;
+
+        err = ip_route_newports(&amp;rt, IPPROTO_TCP,
+                                inet-&gt;sport, inet-&gt;dport, sk);
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failure</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">OK, now commit destination to socket.  </span><span style="color: #ff7f24;">*/</span>
+        sk-&gt;sk_gso_type = SKB_GSO_TCPV4;
+        sk_setup_caps(sk, &amp;rt-&gt;u.dst);
+
+        <span style="color: #00ffff;">if</span> (!tp-&gt;write_seq)
+                tp-&gt;write_seq = secure_tcp_sequence_number(inet-&gt;saddr,
+                                                           inet-&gt;daddr,
+                                                           inet-&gt;sport,
+                                                           usin-&gt;sin_port);
+
+        inet-&gt;id = tp-&gt;write_seq ^ jiffies;
+
+        err = tcp_connect(sk);
+        rt = <span style="color: #7fffd4;">NULL</span>;
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failure</span>;
+
+        <span style="color: #00ffff;">return</span> 0;
+
+<span style="color: #7fffd4;">failure</span>:
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * This unhashes the socket and releases the local port,</span>
+<span style="color: #ff7f24;">         * if necessary.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        tcp_set_state(sk, TCP_CLOSE);
+        ip_rt_put(rt);
+        sk-&gt;sk_route_caps = 0;
+        inet-&gt;dport = 0;
+        <span style="color: #00ffff;">return</span> err;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4"><code>tcp_connect</code></h3>
+<div class="outline-text-3" id="text-3-4">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tcp_connect</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_sock</span> *<span style="color: #eedd82;">tp</span> = tcp_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">buff</span>;
+
+        tcp_connect_init(sk);
+
+        buff = alloc_skb_fclone(MAX_TCP_HEADER + 15, sk-&gt;sk_allocation);
+        <span style="color: #00ffff;">if</span> (unlikely(buff == <span style="color: #7fffd4;">NULL</span>))
+                <span style="color: #00ffff;">return</span> -ENOBUFS;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Reserve space for headers. </span><span style="color: #ff7f24;">*/</span>
+        skb_reserve(buff, MAX_TCP_HEADER);
+
+        tp-&gt;snd_nxt = tp-&gt;write_seq;
+        tcp_init_nondata_skb(buff, tp-&gt;write_seq++, TCPCB_FLAG_SYN);
+        TCP_ECN_send_syn(sk, buff);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Send it off. </span><span style="color: #ff7f24;">*/</span>
+        TCP_SKB_CB(buff)-&gt;when = tcp_time_stamp;
+        tp-&gt;retrans_stamp = TCP_SKB_CB(buff)-&gt;when;
+        skb_header_release(buff);
+        __tcp_add_write_queue_tail(sk, buff);
+        sk-&gt;sk_wmem_queued += buff-&gt;truesize;
+        sk_mem_charge(sk, buff-&gt;truesize);
+        tp-&gt;packets_out += tcp_skb_pcount(buff);
+        tcp_transmit_skb(sk, buff, 1, sk-&gt;sk_allocation);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">We change tp-&gt;snd_nxt after the tcp_transmit_skb() call</span>
+<span style="color: #ff7f24;">         * in order to make this packet get counted in tcpOutSegs.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        tp-&gt;snd_nxt = tp-&gt;write_seq;
+        tp-&gt;pushed_seq = tp-&gt;write_seq;
+        TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Timer for repeating the SYN until an answer. </span><span style="color: #ff7f24;">*/</span>
+        inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
+                                  inet_csk(sk)-&gt;icsk_rto, TCP_RTO_MAX);
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5"><code>tcp_sendmsg</code></h3>
+<div class="outline-text-3" id="text-3-5">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tcp_sendmsg</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kiocb</span> *<span style="color: #eedd82;">iocb</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">socket</span> *<span style="color: #eedd82;">sock</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">msghdr</span> *<span style="color: #eedd82;">msg</span>,
+                <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span> = sock-&gt;sk;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iovec</span> *<span style="color: #eedd82;">iov</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_sock</span> *<span style="color: #eedd82;">tp</span> = tcp_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">iovlen</span>, <span style="color: #eedd82;">flags</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mss_now</span>, <span style="color: #eedd82;">size_goal</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span>, <span style="color: #eedd82;">copied</span>;
+        <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeo</span>;
+
+        lock_sock(sk);
+        TCP_CHECK_TIMER(sk);
+
+        flags = msg-&gt;msg_flags;
+        timeo = sock_sndtimeo(sk, flags &amp; MSG_DONTWAIT);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Wait for a connection to finish. </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> ((1 &lt;&lt; sk-&gt;sk_state) &amp; ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
+                <span style="color: #00ffff;">if</span> ((err = sk_stream_wait_connect(sk, &amp;timeo)) != 0)
+                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_err</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">This should be in poll </span><span style="color: #ff7f24;">*/</span>
+        clear_bit(SOCK_ASYNC_NOSPACE, &amp;sk-&gt;sk_socket-&gt;flags);
+
+        mss_now = tcp_send_mss(sk, &amp;size_goal, flags);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Ok commence sending. </span><span style="color: #ff7f24;">*/</span>
+        iovlen = msg-&gt;msg_iovlen;
+        iov = msg-&gt;msg_iov;
+        copied = 0;
+
+        err = -EPIPE;
+        <span style="color: #00ffff;">if</span> (sk-&gt;sk_err || (sk-&gt;sk_shutdown &amp; SEND_SHUTDOWN))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_err</span>;
+
+        <span style="color: #00ffff;">while</span> (--iovlen &gt;= 0) {
+                <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">seglen</span> = iov-&gt;iov_len;
+                <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *from = iov-&gt;iov_base;
+
+                iov++;
+
+                <span style="color: #00ffff;">while</span> (seglen &gt; 0) {
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">copy</span> = 0;
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max</span> = size_goal;
+
+                        skb = tcp_write_queue_tail(sk);
+                        <span style="color: #00ffff;">if</span> (tcp_send_head(sk)) {
+                                <span style="color: #00ffff;">if</span> (skb-&gt;ip_summed == CHECKSUM_NONE)
+                                        max = mss_now;
+                                copy = max - skb-&gt;len;
+                        }
+
+                        <span style="color: #00ffff;">if</span> (copy &lt;= 0) {
+<span style="color: #7fffd4;">new_segment</span>:
+                                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Allocate new segment. If the interface is SG,</span>
+<span style="color: #ff7f24;">                                 * allocate skb fitting to single page.</span>
+<span style="color: #ff7f24;">                                 </span><span style="color: #ff7f24;">*/</span>
+                                <span style="color: #00ffff;">if</span> (!sk_stream_memory_free(sk))
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">wait_for_sndbuf</span>;
+
+                                skb = sk_stream_alloc_skb(sk, select_size(sk),
+                                                sk-&gt;sk_allocation);
+                                <span style="color: #00ffff;">if</span> (!skb)
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">wait_for_memory</span>;
+
+                                <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                                 * Check whether we can use HW checksum.</span>
+<span style="color: #ff7f24;">                                 </span><span style="color: #ff7f24;">*/</span>
+                                <span style="color: #00ffff;">if</span> (sk-&gt;sk_route_caps &amp; NETIF_F_ALL_CSUM)
+                                        skb-&gt;ip_summed = CHECKSUM_PARTIAL;
+
+                                skb_entail(sk, skb);
+                                copy = size_goal;
+                                max = size_goal;
+                        }
+
+                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Try to append data to the end of skb. </span><span style="color: #ff7f24;">*/</span>
+                        <span style="color: #00ffff;">if</span> (copy &gt; seglen)
+                                copy = seglen;
+
+                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Where to copy to? </span><span style="color: #ff7f24;">*/</span>
+                        <span style="color: #00ffff;">if</span> (skb_tailroom(skb) &gt; 0) {
+                                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">We have some space in skb head. Superb! </span><span style="color: #ff7f24;">*/</span>
+                                <span style="color: #00ffff;">if</span> (copy &gt; skb_tailroom(skb))
+                                        copy = skb_tailroom(skb);
+                                <span style="color: #00ffff;">if</span> ((err = skb_add_data(skb, from, copy)) != 0)
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">do_fault</span>;
+                        } <span style="color: #00ffff;">else</span> {
+                                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">merge</span> = 0;
+                                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = skb_shinfo(skb)-&gt;nr_frags;
+                                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">page</span> *<span style="color: #eedd82;">page</span> = TCP_PAGE(sk);
+                                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">off</span> = TCP_OFF(sk);
+
+                                <span style="color: #00ffff;">if</span> (skb_can_coalesce(skb, i, page, off) &amp;&amp;
+                                    off != PAGE_SIZE) {
+                                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">We can extend the last page</span>
+<span style="color: #ff7f24;">                                         * fragment. </span><span style="color: #ff7f24;">*/</span>
+                                        merge = 1;
+                                } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (i == MAX_SKB_FRAGS ||
+                                           (!i &amp;&amp;
+                                           !(sk-&gt;sk_route_caps &amp; NETIF_F_SG))) {
+                                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Need to add new fragment and cannot</span>
+<span style="color: #ff7f24;">                                         * do this because interface is non-SG,</span>
+<span style="color: #ff7f24;">                                         * or because all the page slots are</span>
+<span style="color: #ff7f24;">                                         * busy. </span><span style="color: #ff7f24;">*/</span>
+                                        tcp_mark_push(tp, skb);
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">new_segment</span>;
+                                } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (page) {
+                                        <span style="color: #00ffff;">if</span> (off == PAGE_SIZE) {
+                                                put_page(page);
+                                                TCP_PAGE(sk) = page = <span style="color: #7fffd4;">NULL</span>;
+                                                off = 0;
+                                        }
+                                } <span style="color: #00ffff;">else</span>
+                                        off = 0;
+
+                                <span style="color: #00ffff;">if</span> (copy &gt; PAGE_SIZE - off)
+                                        copy = PAGE_SIZE - off;
+
+                                <span style="color: #00ffff;">if</span> (!sk_wmem_schedule(sk, copy))
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">wait_for_memory</span>;
+
+                                <span style="color: #00ffff;">if</span> (!page) {
+                                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Allocate new cache page. </span><span style="color: #ff7f24;">*/</span>
+                                        <span style="color: #00ffff;">if</span> (!(page = sk_stream_alloc_page(sk)))
+                                                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">wait_for_memory</span>;
+                                }
+
+                                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Time to copy data. We are close to</span>
+<span style="color: #ff7f24;">                                 * the end! </span><span style="color: #ff7f24;">*/</span>
+                                err = skb_copy_to_page(sk, from, skb, page,
+                                                       off, copy);
+                                <span style="color: #00ffff;">if</span> (err) {
+                                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">If this page was new, give it to the</span>
+<span style="color: #ff7f24;">                                         * socket so it does not get leaked.</span>
+<span style="color: #ff7f24;">                                         </span><span style="color: #ff7f24;">*/</span>
+                                        <span style="color: #00ffff;">if</span> (!TCP_PAGE(sk)) {
+                                                TCP_PAGE(sk) = page;
+                                                TCP_OFF(sk) = 0;
+                                        }
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">do_error</span>;
+                                }
+
+                                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Update the skb. </span><span style="color: #ff7f24;">*/</span>
+                                <span style="color: #00ffff;">if</span> (merge) {
+                                        skb_shinfo(skb)-&gt;frags[i - 1].size +=
+                                                                        copy;
+                                } <span style="color: #00ffff;">else</span> {
+                                        skb_fill_page_desc(skb, i, page, off, copy);
+                                        <span style="color: #00ffff;">if</span> (TCP_PAGE(sk)) {
+                                                get_page(page);
+                                        } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (off + copy &lt; PAGE_SIZE) {
+                                                get_page(page);
+                                                TCP_PAGE(sk) = page;
+                                        }
+                                }
+
+                                TCP_OFF(sk) = off + copy;
+                        }
+
+                        <span style="color: #00ffff;">if</span> (!copied)
+                                TCP_SKB_CB(skb)-&gt;flags &amp;= ~TCPCB_FLAG_PSH;
+
+                        tp-&gt;write_seq += copy;
+                        TCP_SKB_CB(skb)-&gt;end_seq += copy;
+                        skb_shinfo(skb)-&gt;gso_segs = 0;
+
+                        from += copy;
+                        copied += copy;
+                        <span style="color: #00ffff;">if</span> ((seglen -= copy) == 0 &amp;&amp; iovlen == 0)
+                                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+
+                        <span style="color: #00ffff;">if</span> (skb-&gt;len &lt; max || (flags &amp; MSG_OOB))
+                                <span style="color: #00ffff;">continue</span>;
+
+                        <span style="color: #00ffff;">if</span> (forced_push(tp)) {
+                                tcp_mark_push(tp, skb);
+                                __tcp_push_pending_frames(sk, mss_now, TCP_NAGLE_PUSH);
+                        } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (skb == tcp_send_head(sk))
+                                tcp_push_one(sk, mss_now);
+                        <span style="color: #00ffff;">continue</span>;
+
+<span style="color: #7fffd4;">wait_for_sndbuf</span>:
+                        set_bit(SOCK_NOSPACE, &amp;sk-&gt;sk_socket-&gt;flags);
+<span style="color: #7fffd4;">wait_for_memory</span>:
+                        <span style="color: #00ffff;">if</span> (copied)
+                                tcp_push(sk, flags &amp; ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
+
+                        <span style="color: #00ffff;">if</span> ((err = sk_stream_wait_memory(sk, &amp;timeo)) != 0)
+                                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">do_error</span>;
+
+                        mss_now = tcp_send_mss(sk, &amp;size_goal, flags);
+                }
+        }
+
+<span style="color: #7fffd4;">out</span>:
+        <span style="color: #00ffff;">if</span> (copied)
+                tcp_push(sk, flags, mss_now, tp-&gt;nonagle);
+        TCP_CHECK_TIMER(sk);
+        release_sock(sk);
+        <span style="color: #00ffff;">return</span> copied;
+
+<span style="color: #7fffd4;">do_fault</span>:
+        <span style="color: #00ffff;">if</span> (!skb-&gt;len) {
+                tcp_unlink_write_queue(skb, sk);
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">It is the one place in all of TCP, except connection</span>
+<span style="color: #ff7f24;">                 * reset, where we can be unlinking the send_head.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                tcp_check_send_head(sk, skb);
+                sk_wmem_free_skb(sk, skb);
+        }
+
+<span style="color: #7fffd4;">do_error</span>:
+        <span style="color: #00ffff;">if</span> (copied)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+<span style="color: #7fffd4;">out_err</span>:
+        err = sk_stream_error(sk, flags, err);
+        TCP_CHECK_TIMER(sk);
+        release_sock(sk);
+        <span style="color: #00ffff;">return</span> err;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-6" class="outline-3">
+<h3 id="sec-3-6"><code>tcp_close</code></h3>
+<div class="outline-text-3" id="text-3-6">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tcp_close</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>, <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeout</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">data_was_unread</span> = 0;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span>;
+
+        lock_sock(sk);
+        sk-&gt;sk_shutdown = SHUTDOWN_MASK;
+
+        <span style="color: #00ffff;">if</span> (sk-&gt;sk_state == TCP_LISTEN) {
+                tcp_set_state(sk, TCP_CLOSE);
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Special case. </span><span style="color: #ff7f24;">*/</span>
+                inet_csk_listen_stop(sk);
+
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">adjudge_to_death</span>;
+        }
+
+        <span style="color: #ff7f24;">/*  </span><span style="color: #ff7f24;">We need to flush the recv. buffs.  We do this only on the</span>
+<span style="color: #ff7f24;">         *  descriptor close, not protocol-sourced closes, because the</span>
+<span style="color: #ff7f24;">         *  reader process may not have drained the data yet!</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">while</span> ((skb = __skb_dequeue(&amp;sk-&gt;sk_receive_queue)) != <span style="color: #7fffd4;">NULL</span>) {
+                <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">len</span> = TCP_SKB_CB(skb)-&gt;end_seq - TCP_SKB_CB(skb)-&gt;seq -
+                          tcp_hdr(skb)-&gt;fin;
+                data_was_unread += len;
+                __kfree_skb(skb);
+        }
+
+        sk_mem_reclaim(sk);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">As outlined in RFC 2525, section 2.17, we send a RST here because</span>
+<span style="color: #ff7f24;">         * data was lost. To witness the awful effects of the old behavior of</span>
+<span style="color: #ff7f24;">         * always doing a FIN, run an older 2.1.x kernel or 2.0.x, start a bulk</span>
+<span style="color: #ff7f24;">         * GET in an FTP client, suspend the process, wait for the client to</span>
+<span style="color: #ff7f24;">         * advertise a zero window, then kill -9 the FTP client, wheee...</span>
+<span style="color: #ff7f24;">         * Note: timeout is always zero in such a case.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (data_was_unread) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Unread data was tossed, zap the connection. </span><span style="color: #ff7f24;">*/</span>
+                NET_INC_STATS_USER(sock_net(sk), LINUX_MIB_TCPABORTONCLOSE);
+                tcp_set_state(sk, TCP_CLOSE);
+                tcp_send_active_reset(sk, sk-&gt;sk_allocation);
+        } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (sock_flag(sk, SOCK_LINGER) &amp;&amp; !sk-&gt;sk_lingertime) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Check zero linger _after_ checking for unread data. </span><span style="color: #ff7f24;">*/</span>
+                sk-&gt;sk_prot-&gt;disconnect(sk, 0);
+                NET_INC_STATS_USER(sock_net(sk), LINUX_MIB_TCPABORTONDATA);
+        } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (tcp_close_state(sk)) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">We FIN if the application ate all the data before</span>
+<span style="color: #ff7f24;">                 * zapping the connection.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">RED-PEN. Formally speaking, we have broken TCP state</span>
+<span style="color: #ff7f24;">                 * machine. State transitions:</span>
+<span style="color: #ff7f24;">                 *</span>
+<span style="color: #ff7f24;">                 * TCP_ESTABLISHED -&gt; TCP_FIN_WAIT1</span>
+<span style="color: #ff7f24;">                 * TCP_SYN_RECV -&gt; TCP_FIN_WAIT1 (forget it, it's impossible)</span>
+<span style="color: #ff7f24;">                 * TCP_CLOSE_WAIT -&gt; TCP_LAST_ACK</span>
+<span style="color: #ff7f24;">                 *</span>
+<span style="color: #ff7f24;">                 * are legal only when FIN has been sent (i.e. in window),</span>
+<span style="color: #ff7f24;">                 * rather than queued out of window. Purists blame.</span>
+<span style="color: #ff7f24;">                 *</span>
+<span style="color: #ff7f24;">                 * F.e. "RFC state" is ESTABLISHED,</span>
+<span style="color: #ff7f24;">                 * if Linux state is FIN-WAIT-1, but FIN is still not sent.</span>
+<span style="color: #ff7f24;">                 *</span>
+<span style="color: #ff7f24;">                 * The visible declinations are that sometimes</span>
+<span style="color: #ff7f24;">                 * we enter time-wait state, when it is not required really</span>
+<span style="color: #ff7f24;">                 * (harmless), do not send active resets, when they are</span>
+<span style="color: #ff7f24;">                 * required by specs (TCP_ESTABLISHED, TCP_CLOSE_WAIT, when</span>
+<span style="color: #ff7f24;">                 * they look as CLOSING or LAST_ACK for Linux)</span>
+<span style="color: #ff7f24;">                 * Probably, I missed some more holelets.</span>
+<span style="color: #ff7f24;">                 *                                              --ANK</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                tcp_send_fin(sk);
+        }
+
+        sk_stream_wait_close(sk, timeout);
+
+<span style="color: #7fffd4;">adjudge_to_death</span>:
+        state = sk-&gt;sk_state;
+        sock_hold(sk);
+        sock_orphan(sk);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">It is the last release_sock in its life. It will remove backlog. </span><span style="color: #ff7f24;">*/</span>
+        release_sock(sk);
+
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Now socket is owned by kernel and we acquire BH lock</span>
+<span style="color: #ff7f24;">           to finish close. No need to check for user refs.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        local_bh_disable();
+        bh_lock_sock(sk);
+        WARN_ON(sock_owned_by_user(sk));
+
+        percpu_counter_inc(sk-&gt;sk_prot-&gt;orphan_count);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Have we already been destroyed by a softirq or backlog? </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (state != TCP_CLOSE &amp;&amp; sk-&gt;sk_state == TCP_CLOSE)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+
+        <span style="color: #ff7f24;">/*      </span><span style="color: #ff7f24;">This is a (useful) BSD violating of the RFC. There is a</span>
+<span style="color: #ff7f24;">         *      problem with TCP as specified in that the other end could</span>
+<span style="color: #ff7f24;">         *      keep a socket open forever with no application left this end.</span>
+<span style="color: #ff7f24;">         *      We use a 3 minute timeout (about the same as BSD) then kill</span>
+<span style="color: #ff7f24;">         *      our end. If they send after that then tough - BUT: long enough</span>
+<span style="color: #ff7f24;">         *      that we won't make the old 4*rto = almost no time - whoops</span>
+<span style="color: #ff7f24;">         *      reset mistake.</span>
+<span style="color: #ff7f24;">         *</span>
+<span style="color: #ff7f24;">         *      Nope, it was not mistake. It is really desired behaviour</span>
+<span style="color: #ff7f24;">         *      f.e. on http servers, when such sockets are useless, but</span>
+<span style="color: #ff7f24;">         *      consume significant resources. Let's do it with special</span>
+<span style="color: #ff7f24;">         *      linger2 option.                                 --ANK</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+
+        <span style="color: #00ffff;">if</span> (sk-&gt;sk_state == TCP_FIN_WAIT2) {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_sock</span> *<span style="color: #eedd82;">tp</span> = tcp_sk(sk);
+                <span style="color: #00ffff;">if</span> (tp-&gt;linger2 &lt; 0) {
+                        tcp_set_state(sk, TCP_CLOSE);
+                        tcp_send_active_reset(sk, GFP_ATOMIC);
+                        NET_INC_STATS_BH(sock_net(sk),
+                                        LINUX_MIB_TCPABORTONLINGER);
+                } <span style="color: #00ffff;">else</span> {
+                        <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">tmo</span> = tcp_fin_time(sk);
+
+                        <span style="color: #00ffff;">if</span> (tmo &gt; TCP_TIMEWAIT_LEN) {
+                                inet_csk_reset_keepalive_timer(sk,
+                                                tmo - TCP_TIMEWAIT_LEN);
+                        } <span style="color: #00ffff;">else</span> {
+                                tcp_time_wait(sk, TCP_FIN_WAIT2, tmo);
+                                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+                        }
+                }
+        }
+        <span style="color: #00ffff;">if</span> (sk-&gt;sk_state != TCP_CLOSE) {
+                sk_mem_reclaim(sk);
+                <span style="color: #00ffff;">if</span> (tcp_too_many_orphans(sk, 0)) {
+                        <span style="color: #00ffff;">if</span> (net_ratelimit())
+                                printk(KERN_INFO <span style="color: #ffa07a;">"TCP: too many of orphaned "</span>
+                                       <span style="color: #ffa07a;">"sockets\n"</span>);
+                        tcp_set_state(sk, TCP_CLOSE);
+                        tcp_send_active_reset(sk, GFP_ATOMIC);
+                        NET_INC_STATS_BH(sock_net(sk),
+                                        LINUX_MIB_TCPABORTONMEMORY);
+                }
+        }
+
+        <span style="color: #00ffff;">if</span> (sk-&gt;sk_state == TCP_CLOSE)
+                inet_csk_destroy_sock(sk);
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Otherwise, socket is reprieved until protocol close. </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #7fffd4;">out</span>:
+        bh_unlock_sock(sk);
+        local_bh_enable();
+        sock_put(sk);
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2014-11-25 Tue 20:31</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

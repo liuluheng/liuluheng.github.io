@@ -1,0 +1,1731 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Hardware/Software IRQs, tasklets and wait queues</title>
+<!-- 2014-12-12 Fri 22:30 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Hardware/Software IRQs, tasklets and wait queues</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Interrupts</a>
+<ul>
+<li><a href="#sec-1-1">Interrupt Types</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Hardware IRQs</a>
+<ul>
+<li><a href="#sec-2-1">Processing Interrupts</a></li>
+<li><a href="#sec-2-2">Data Structures</a></li>
+<li><a href="#sec-2-3">Interrupt Flow Handling</a></li>
+<li><a href="#sec-2-4">Initializing and Reserving IRQs</a></li>
+<li><a href="#sec-2-5">Calling the High-level ISR</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Software interrupts</a>
+<ul>
+<li><a href="#sec-3-1">Starting SoftIRQ Processing</a></li>
+<li><a href="#sec-3-2">The SoftIRQ Daemon</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Tasklets</a>
+<ul>
+<li><a href="#sec-4-1">Generating Tasklets</a></li>
+<li><a href="#sec-4-2">Registering Tasklets</a></li>
+<li><a href="#sec-4-3">Executing Tasklets</a></li>
+<li><a href="#sec-4-4">Example</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Wait queues and completions</a>
+<ul>
+<li><a href="#sec-5-1">Wait Queues</a></li>
+<li><a href="#sec-5-2">Completions</a></li>
+<li><a href="#sec-5-3">Work Queues</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Interrupts</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Linux中2种不同的中断:
+</p>
+<ul class="org-ul">
+<li>Hardware Interrupts: 又系统和连接的外围设备做产生.
+</li>
+<li>SoftIRQs: 在kernel本身被用来有效实现延迟的活动.
+</li>
+</ul>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Interrupt Types</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+总的来说,中断类型可以被分为2类:
+</p>
+<ul class="org-ul">
+<li>Synchronous Interrupts 和 Exceptions: 由CPU自身产生,并用户当前运行的程序.Exceptions 由许多原因触发:在运行时产生程序错误(经典例子是除
+0).或异常情况发生,处理器需要外部的帮助解决它.
+</li>
+<li>Asynchronous interrupts: 是由外围设备产生的经典中断,可以在任何时候发生.与synchronous interrupts不同, asynchronous interrupts不和特定进程相关.它能在任何时候发生(中断打开情况下),无论当前系统运行什么活动.
+</li>
+</ul>
+
+<p>
+如果CPU当前没有在kernel模式下,它会从用户模式跳转到内核模式.然后它执行一个特定的程序叫做 interrupt service routine(ISR) 或 interrupt
+handler.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Hardware IRQs</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+中断其实不能直接被处理器外部设备触发,而它被请求是在一个叫interrupt controller
+的标准元件的帮助下.所以外部设备只能请求中断通过此元件,这样的请求被熟知为IRQs或interrupt requests.
+</p>
+</div>
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Processing Interrupts</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+一旦CPU被通知有中断,它需要转到相应的软件程序去进一步处理.因为每个
+interrupt和每个exception有为一个编号,kernel使用一张表来包含指向处理函数的指针.如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/interrupt handlers.jpeg" alt="interrupt handlers.jpeg" />
+</p>
+</div>
+</div>
+
+<ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>Entry and Exit Tasks<br  /><div class="outline-text-4" id="text-2-1-1">
+<p>
+如下图,interrupt处理被分为3部分.首先,适合处理函数能运行的环境被设置好;
+然后处理函数本身被调用;最后系统恢复到interrupt前的状态.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/handing-an-interrupt.jpeg" alt="handing-an-interrupt.jpeg" />
+</p>
+</div>
+
+<p>
+进入和离开中断处理程序确保处理器从用户模式转到kernel模式.进入代码中关键部分是从用户模式的stack转化到kernel模式的stack,离开代码相反.所以必须保存当前寄存器的值,平台相关的寄存器list结构 <code>pt_regs</code> 中列出了所有在
+kernel模式下会改变的寄存器.
+</p>
+
+<p>
+离开代码中kernel检查是否:
+</p>
+<ul class="org-ul">
+<li>调度器需要选择一个新的进程来取代旧的进程.
+</li>
+<li>有需要传递给进程的信号.
+</li>
+</ul>
+
+<p>
+因为C和汇编语言的交互需要,特别两者数据交换,这些处理代码在
+<code>arch/arch/kernel/entry.S</code> 中.
+</p>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Data Structures</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+管理IRQs中心是一张每个条目就是一个IRQ的全局的数组.因为数组位置和中断编号是一致的.所以很容易通过特定IRQ确定条目位置: IRQ 0的位置是0如此.数组定义如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/irq/handle.c</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> <span style="color: #eedd82;">irq_desc</span>[NR_IRQS] __cacheline_aligned_in_smp = {
+  [0 ... NR_IRQS-1] = {
+    .status = IRQ_DISABLED,
+    .chip = &amp;no_irq_chip,
+    .handle_irq = handle_bad_irq,
+    .depth = 1,
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+  }
+};
+</pre>
+</div>
+
+<p>
+尽管使用架构不相关的数据类型,但是最大支持IRQs个数由平台特定定值
+<code>NR_IRQS</code> 决定.对于大多数架构来说,这个定值被定义在处理器特定的头文件
+<code>include/asm-arch/irq.h</code> 中.初始,所有中断条目没有安装指定的处理函数,使用 <code>handle_bad_irq</code> 作为处理函数,它仅仅确认终端.
+</p>
+
+<p>
+Kernel的IRQ处理子系统包含3个抽象层,如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/various-interrupt-handlers.jpeg" alt="various-interrupt-handlers.jpeg" />
+</p>
+</div>
+
+<ol class="org-ol">
+<li><b>High-Level Interrupt Service Routines (ISRs)</b>: 进行由设备驱动中断引发的必要工作.
+</li>
+<li><b>Interrupt Flow Handling</b>: 处理中断不同类型如边缘和电平触发间的差异.
+</li>
+<li><b>Chip-Level Hardware Encapsulation</b>: 直接与底层产生中断的硬件交互.
+</li>
+</ol>
+
+<p>
+继续分析代码,表示IRQ描述符的结构定义如下:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> {
+  <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle_irq</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">handler_data</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">chip_data</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IRQ action list </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">status</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IRQ status </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">depth</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nested irq disables </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq_count</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">For detecting broken IRQs </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irqs_unhandled</span>;
+  ...
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *name;
+} <span style="color: #eedd82;">____cacheline_internodealigned_in_smp</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>flow层的IRQ处理函数由 <code>handle_irq</code> 提供. <code>handler_data</code> 可以指向处理特定的数据. <code>handle_irq</code> 被调用当中断发生时.这个函数并负责使用
+<code>chip</code> 提供的控制特定方法来完成必要的底层操作来进行中断处理.
+</li>
+<li><code>action</code> 提供一串当中断发生时需要被执行的动作.
+</li>
+<li>芯片特定的处理封装在 <code>chip</code> 中.一个特殊的数据结构被引入, <code>chip_data</code>
+  指向相应使用的数据.
+</li>
+<li><code>name</code> 指定 <code>/proc/interrupts</code> 中显示的名字.
+</li>
+</ul>
+
+<p>
+其中 <code>depth</code> 有2个功能,用来指示IRQ线是否打开或关闭,并且记录被关闭的次数. 一个正数表示被关闭.而0表示被打开.为什么正数被使用来关闭IRQs?因为每次有代码关闭中断, <code>depth</code> 作为计数加1, 每次中断被再次打开, 计数减1.
+</p>
+
+<p>
+IRQ能改变它的状态不仅在初始化时,而且可以在运行时. <code>status</code> 描述当前状态. <code>&lt;irq.h&gt;</code> 定义了许多定值来描述当前IRQ线的状态.
+</p>
+
+<ul class="org-ul">
+<li><code>IRQ_DISABLED</code> is used for an IRQ line disabled by a device driver.
+It instructs the kernel not to enter the handler.
+</li>
+<li>During execution of an IRQ handler the state is set to
+<code>IRQ_INPROGRESS</code>.As with <code>IRQ_DISABLED</code>, this prohibits the
+remaining kernel code from executing the handler.
+</li>
+<li><code>IRQ_PENDING</code> is active when the CPU has noticed an interrupt but has
+not yet executed the corresponding handler.
+</li>
+<li><code>IRQ_MASKED</code> is required to properly handle interrupts that occur
+during interrupt processing;
+</li>
+<li><code>IRQ_PER_CPU</code> is set when an IRQ can occur on a single CPU only. (On
+SMP systems this renders several protection mechanisms against
+concurrent accesses superfluous.)
+</li>
+<li><code>IRQ_LEVEL</code> is used on Alpha and PowerPC to differentiate
+level-triggered and edge-triggered IRQs.
+</li>
+<li><code>IRQ_REPLAY</code> means that the IRQ has been disabled but a previous
+interrupt has not yet been acknowledged.
+</li>
+<li><code>IRQ_AUTODETECT</code> and <code>IRQ_WAITING</code> are used for the automatic
+detection and configuration of IRQs. I will not discuss this in more
+detail, but mention that the respective code is located in <code>kernel/irq/autoprobe.c</code>.
+</li>
+<li><code>IRQ_NOREQUEST</code> is set if the IRQ can be shared between devices and
+must thus not be exclusively requested by a single device.
+</li>
+</ul>
+
+<p>
+使用 <code>status</code> 的当前内容,很容易让kernel查询特定IRQ的状态而不用知道硬件特定的底层实现.但仅仅设置相应的标识不能产生任何效果,底层的硬件必须被告知状态的改变.
+</p>
+</div>
+
+<ul class="org-ul"><li><a id="sec-2-2-1" name="sec-2-2-1"></a>IRQ Controller Abstraction<br  /><div class="outline-text-4" id="text-2-2-1">
+<p>
+芯片特性的控制被封装在结构 <code>struct irq_chip</code> 中,基本如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">startup</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">shutdown</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">enable</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">disable</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">ack</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">mask</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">mask_ack</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">unmask</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">eoi</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+  <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">set_type</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow_type</span>);
+};
+</pre>
+</div>
+
+<p>
+这个结构需要考虑到不同IRQ实现的特性.
+</p>
+
+<p>
+<code>name</code> 维护一个硬件控制器的标识.IA-32系统可能的值是‘‘XTPIC‘‘ 和 ‘‘IO-APIC,’’.
+</p>
+
+<p>
+其他函数指针有如下意思:
+</p>
+<ul class="org-ul">
+<li><code>startup</code> 指向用来第一次初始化IRQ的函数.
+</li>
+<li><code>enable</code> 使能IRQ.
+</li>
+<li><code>disable</code> 是IRQ无效化,而 <code>shutdown</code> 彻底关闭中断源.
+</li>
+<li><code>ack</code> 与中断控制的硬件紧密相连.在一些模式下,IRQ请求的到达必须得到确认以至之后的请求才能被服务.
+</li>
+<li><code>end</code> 被调用来标志中断处理的结束.
+</li>
+<li>在多核系统中, <code>set_affinity</code> 可以被用来声明特定IRQs由某个CPU处理.
+</li>
+<li><code>set_type</code> 用来设置IRQ flow类型.
+</li>
+</ul>
+
+<p>
+以IO-APIC为例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">arch/x86/kernel/apic/io_apic.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> <span style="color: #98fb98;">ioapic_chip</span> <span style="color: #eedd82;">__read_mostly</span> = {
+        .name           = <span style="color: #ffa07a;">"IO-APIC"</span>,
+        .startup        = startup_ioapic_irq,
+        .mask           = mask_IO_APIC_irq,
+        .unmask         = unmask_IO_APIC_irq,
+        .ack            = ack_apic_edge,
+        .eoi            = ack_apic_level,
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SMP
+        .set_affinity   = set_ioapic_affinity_irq,
+<span style="color: #b0c4de;">#endif</span>
+        .retrigger      = ioapic_retrigger_irq,
+};
+</pre>
+</div>
+
+<p>
+在系统中查看中断统计信息:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ cat /proc/interrupts 
+           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5       CPU6       CPU7       
+  0:         41          0          0   31487034          0          0          0          0   IO-APIC-edge      timer
+  1:          1          0          0          2          0          0          0          0   IO-APIC-edge      i8042
+  4:          0          0          0          8          0          0          0          0   IO-APIC-edge    
+  8:          0          0          0          1          0          0          0          0   IO-APIC-edge      rtc0
+  9:          0          0          0          0          0          0          0          0   IO-APIC-fasteoi   acpi
+ 12:          0          0          0          4          0          0          0          0   IO-APIC-edge      i8042
+ 16:         10          0          0          0          0          0         40          0   IO-APIC-fasteoi   ehci_hcd:usb1
+ 17:         91          0          0          0          0          0          0        148   IO-APIC-fasteoi   snd_hda_intel
+ 23:    6420912          0          0          0          0          0        141          0   IO-APIC-fasteoi   ehci_hcd:usb2
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-2-2-2" name="sec-2-2-2"></a>Handler Function Representation<br  /><div class="outline-text-4" id="text-2-2-2">
+<p>
+其中有 <code>irqaction</code> 结构如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> {
+  <span style="color: #98fb98;">irq_handler_t</span> <span style="color: #eedd82;">handler</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">dev_id</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">next</span>;
+}
+</pre>
+</div>
+
+<p>
+其中最重要的元素是处理函数 <code>irq_handler_t handler</code> , 当设备请求系统中断时,这个处理函数被调用. <code>flag</code> 描述IRQ的一些特性,如下被定义在
+<code>&lt;interrupt.h&gt;</code> :
+</p>
+
+<ul class="org-ul">
+<li><code>IRQF_SHARED</code> is set forshared IRQsand signals that more than one
+device is using an IRQ line.
+</li>
+<li><code>IRQF_SAMPLE_RANDO</code> is set when the IRQ contributes to the kernel
+entropy pool.
+</li>
+<li><code>IRQF_DISABLED</code> indicates that the IRQ handler must be executed with
+interrupts disabled.
+</li>
+<li><code>IRQF_TIMER</code> denotes a timer interrupt.
+</li>
+</ul>
+
+<p>
+next被使用来实现共享IRQ处理.一些 <code>irqaction</code> 实例被分组成一个链表.同一个链表的所有元素必须处理同一个IRQ编号.如下图描述它们如何相连:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/irq-management.jpeg" alt="irq-management.jpeg" />
+</p>
+</div>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Interrupt Flow Handling</h3>
+<div class="outline-text-3" id="text-2-3">
+</div><ul class="org-ul"><li><a id="sec-2-3-1" name="sec-2-3-1"></a>Setting Controller Hardware<br  /><div class="outline-text-4" id="text-2-3-1">
+<p>
+kernel提供的注册 <code>irq_chip</code> 和设置flow处理的函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">set_irq_chip</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_handler</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_chained_handler</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>)
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_chip_and_handler</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>,
+                              <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_chip_and_handler_name</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>,
+                                   <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>);
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>set_irq_chip</code> 把IRQ芯片以 <code>irq_chip</code> 实例附加到特定中断上. 如果是
+NULL,那么使用通用值 <code>no_irq_chip</code>.
+</li>
+<li><code>set_irq_handler</code> 和 <code>set_irq_chained_handler</code> 设置flow处理函数给特定IRQ编号.
+</li>
+<li><code>set_chip_and_handler</code> 同时设置两者.
+</li>
+</ul>
+</div>
+</li>
+<li><a id="sec-2-3-2" name="sec-2-3-2"></a>Flow Handling<br  /><div class="outline-text-4" id="text-2-3-2">
+<p>
+在分析flow处理实现前,先看怎么定义自己的类型. <code>irq_flow_handler_t</code> 指定
+IRQ flow处理函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">void</span> <span style="color: #98fb98;">fastcall</span> (*irq_flow_handler_t)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>,
+                                            <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> *<span style="color: #eedd82;">desc</span>);
+</pre>
+</div>
+
+<p>
+Flow处理函数获取IRQ的编号和对此中断负责的 <code>irq_desc</code> 实例.不同硬件需要不同的flow处理方法: 比如边沿(edge)和电平(levle)触发需要不同的处理方法.kernel提供一些默认的flow处理对不同类型.它们有一个共同点: 每个flow处理最后都会调用高层IRQs. <code>handle_IRQ_event</code> 负责调用上层处理.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-2-3-2-1" name="sec-2-3-2-1"></a>Edge-Triggered Interrupts<br  /><div class="outline-text-5" id="text-2-3-2-1">
+<p>
+边沿触发的默认处理是 <code>handle_edge_irq</code> .代码流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/handle-edge-irq.jpeg" alt="handle-edge-irq.jpeg" />
+</p>
+</div>
+</div>
+</li>
+<li><a id="sec-2-3-2-2" name="sec-2-3-2-2"></a>Level-Triggered Interrupts<br  /><div class="outline-text-5" id="text-2-3-2-2">
+<p>
+和边沿触发相比,电平触发处理相对简单点.代码流程如下:
+<img src="./Files/handle-level-irq.jpeg" alt="handle-level-irq.jpeg" />
+</p>
+</div>
+</li>
+<li><a id="sec-2-3-2-3" name="sec-2-3-2-3"></a>Other Types of Interrupts<br  /><div class="outline-text-5" id="text-2-3-2-3">
+<p>
+kernel还提供一些其他默认的flow处理:
+</p>
+<ul class="org-ul">
+<li>在IRQ处理完后,只有一个芯片特定的函数需要被调用: <code>chip-&gt;eoi</code>.默认的函数是 <code>handle_fasteoi_irq</code>.
+</li>
+<li>没有flow控制的简单中断由 <code>handle_simple_irq</code> 处理.
+</li>
+<li>对于每个CPU的IRQs,IRQs只能在多核系统中某个特定的CPU处理由
+<code>handle_percpu_irq</code> 完成.
+</li>
+</ul>
+</div>
+</li></ul>
+</li></ul>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">Initializing and Reserving IRQs</h3>
+<div class="outline-text-3" id="text-2-4">
+</div><ul class="org-ul"><li><a id="sec-2-4-1" name="sec-2-4-1"></a>Registering IRQs<br  /><div class="outline-text-4" id="text-2-4-1">
+<p>
+设备驱动动态的注册IRQ可以通过如下函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/irq/manage.c</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">request_irq</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>,
+                <span style="color: #98fb98;">irqreturn_t</span> <span style="color: #eedd82;">handler</span>,
+                <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">irqflags</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">devname</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">dev_id</span>)
+</pre>
+</div>
+
+<p>
+如下是它的代码流程:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/request-irq.jpeg" alt="request-irq.jpeg" />
+</p>
+</div>
+</div>
+</li>
+<li><a id="sec-2-4-2" name="sec-2-4-2"></a>Freeing IRQs<br  /><div class="outline-text-4" id="text-2-4-2">
+<p>
+移除IRQ的函数 <code>remove_irq</code> 在 <code>kernel/irq/manage.c</code> 中,并通过调用函数
+<code>__free_irq</code> 完成.
+</p>
+
+<ol class="org-ol">
+<li>对于每个IRQ,可以有多个行为共享它,所以单单IRQ编号不能识别指定IRQ,同时需要 <code>dev_id</code>, 所以一开始扫描行为列表,找到相应IRQ条目.
+</li>
+<li>若硬件相关的 <code>chip-&gt;shutdown</code> 函数存在,调用它,若不存在,就调用
+<code>chip-&gt;disable</code>,
+</li>
+<li>释放与此IRQ相关的数据结构.
+</li>
+</ol>
+</div>
+</li>
+<li><a id="sec-2-4-3" name="sec-2-4-3"></a>Registering Interrupts<br  /><div class="outline-text-4" id="text-2-4-3">
+<p>
+上面分析的是由系统外围注册和产生中断的机制.但是kernel还必须处理来自它本身的进程或用户进程执行的软件所触发的中断.与IRQs相比,kernle不需要提供动态注册中断处理的接口.因为使用个数在初始化时就知道并且之后不会改变.注册中断,异常,和traps在kernel初始化时进行,并且它们的预留部分不再改变在运行时.
+</p>
+
+<p>
+当一个中断产生,相应的中断处理直接被自动进行.因为系统中断并不支持中断共享.总的来说,系统回应中断以如下2种方式:
+</p>
+<ul class="org-ul">
+<li>一个signal被告知给当前用户进程有错误发生.
+</li>
+<li>kernel隐式的纠正错误.比如page fault的产生,系统自动纠正它.
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">Calling the High-level ISR</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+如上所述flow处理最后都会调用 <code>handle_IRQ_event</code> 来调用上层相关ISRs.这个函数需要IRQ编号和action链为参数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/irq/handle.c</span>
+<span style="color: #98fb98;">irqreturn_t</span> <span style="color: #87cefa;">handle_IRQ_event</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>);
+</pre>
+</div>
+
+<p>
+<code>handle_IRQ_event</code> 进行如下行为:
+</p>
+<ul class="org-ul">
+<li>如果 <code>IRQF_DISABLED</code> 在第一个处理函数中没有被设置,中断使能
+<code>local_irq_enable_in_hardirq</code> ,也就是处理函数能被其他IRQs中断.
+</li>
+<li>注册IRQ的 <code>action</code> 函数一个接一个被调用.
+</li>
+<li>如果IRQ的 <code>IRQF_SAMPLE_RANDOM</code> 被设置, <code>add_interrupt_randomness</code> 被调用来使用事件的时间添加为随机数产生源(如果中断随即发生,它们是理想的随机源).
+</li>
+<li>最后调用 <code>local_irq_disable</code> 关闭中断.因为打开和关闭中断不用匹配,所以无论一开始它被打开或关闭. <code>handle_IRQ_event</code> 被调用时,中断被关闭,
+离开时再次关闭它.
+</li>
+</ul>
+
+<p>
+对于共享的IRQs,kernel没有办法知道哪个设备触发的请求.整个留给处理函数使用设备相关的寄存器或其他硬件特性来找出中断源头.如果中断不是相关处理函数,立刻返回.所以 <code>handle_IRQ_event</code> 无从知道这个中断是否对它请求,所以
+kernel执行所有处理函数,无论第一个还是最后一个成功.
+</p>
+
+<p>
+无论如何,kernel能检查是否有对此IRQ负责的处理. <code>irqreturn_t</code> 被定义作为处理函数的返回值.它的值是 <code>IRQ_NONE</code> 或 <code>IRQ_HANDLED</code>. 在进行所有处理函数时,kernel对所有处理的返回做或运算,得出IRQ是否被处理的结果.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Software interrupts</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+软中断能使kernel延后执行任务.因为它们的行为与如上描述的中断类似,但是完全在软件实现,所以它们被称为软中断或softIRQs.
+</p>
+
+<p>
+softIRQ的中心元素是一张维护 <code>softirq_action</code> 类型的表, 如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;softirq.c&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> <span style="color: #eedd82;">softirq_vec</span>[NR_SOFTIRQS] __cacheline_aligned_in_smp;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span>
+{
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">action</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *);
+};
+</pre>
+</div>
+
+<p>
+<code>action</code> 是指向当软中断发生,kernel执行的处理函数.在 <code>softirq_action</code>
+中没有封装data指针,每个处理函数的数据由各自维护,并在多核系统中,为每个核定义此变量使得多个软中断同时在多个不同核运行,以 <code>HI_SOFTIRQ</code> 软中断为例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">define</span>
+<span style="color: #00ffff;">static</span> <span style="color: #87cefa;">DEFINE_PER_CPU</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_head</span>, <span style="color: #98fb98;">tasklet_hi_vec</span>);
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">use</span>
+list = __get_cpu_var(tasklet_hi_vec).head;
+</pre>
+</div>
+
+<p>
+软中断在kernel执行它们前,必须注册, <code>open_softirq</code> 函数提供此目的,注册新的softIRQ到表 <code>softirq_vec</code> 指定位置:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/softirq.c</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">open_softirq</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nr</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">action</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *))
+{
+        softirq_vec[nr].action = action;
+}
+</pre>
+</div>
+
+<p>
+事实上,每个softIRQ都有一个唯一的编号,也表示softIRQs是相对稀缺的资源.只有中心kernel代码使用软中断,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">enum</span>
+{
+        <span style="color: #eedd82;">HI_SOFTIRQ</span>=0,
+        <span style="color: #98fb98;">TIMER_SOFTIRQ</span>,
+        <span style="color: #98fb98;">NET_TX_SOFTIRQ</span>,
+        <span style="color: #98fb98;">NET_RX_SOFTIRQ</span>,
+        <span style="color: #98fb98;">BLOCK_SOFTIRQ</span>,
+        <span style="color: #98fb98;">BLOCK_IOPOLL_SOFTIRQ</span>,
+        <span style="color: #98fb98;">TASKLET_SOFTIRQ</span>,
+        <span style="color: #98fb98;">SCHED_SOFTIRQ</span>,
+        <span style="color: #98fb98;">HRTIMER_SOFTIRQ</span>,
+        <span style="color: #98fb98;">RCU_SOFTIRQ</span>,    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Preferable RCU should always be the last softirq </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #eedd82;">NR_SOFTIRQS</span>
+};
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>两个被用来是实现tasklets的是 <code>HI_SOFTIRQ</code> 和 <code>TASKLET_SOFTIRQ</code> .
+</li>
+<li>在网络实现中,用来接收和发送操作的 <code>NET_RX_SOFTIRQ</code> 和
+<code>NET_TX_SOFTIRQ</code> .
+</li>
+<li>块设备实现异步请求的 <code>BLOCK_SOFTIRQ</code> 和 <code>BLOCK_IOPOLL_SOFTIRQ</code> .
+</li>
+<li>调度器实现在SMP系统上周期性负载平衡的 <code>BLOCK_IOPOLL_SOFTIRQ</code> .
+</li>
+<li>高精度时钟的实现使用 <code>HRTIMER_SOFTIRQ</code>.
+</li>
+</ul>
+
+<p>
+对softIRQs编号产生次序优先,不影响每个处理函数的执行频率或相对其他活动的优先权,它定义同时多个处理函数被激活或等待,依次执行的顺序.
+</p>
+
+<p>
+<code>raise_softirq(int nr)</code> 被用来触发一个软中断,目的软中断编号作为传入参数.这个函数在每个CPU变量
+<code>irq_stat[smp_processor_id].__softirq_pending</code> 设置相应比特位.这标志
+softIRQ要执行并延后执行.使用处理器特定的bitmap,kernel能在不同CPU上同时运行softIRQ.
+</p>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Starting SoftIRQ Processing</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+有许多方法开始softIRQ的处理,但最后都调用 <code>do_softirq</code> 函数.如下图描述它的代码流程:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/do-softirq.jpeg" alt="do-softirq.jpeg" />
+</p>
+</div>
+
+<p>
+首先函数确保它不在中断中(也就是一个硬件中断).如果在,立即终止.因为软中断是用来执行ISRs中不重要的部分,所以代码本身不能在一个中断处理中调用.
+</p>
+
+<p>
+由函数 <code>local_softirq_pending</code> 得到当前CPU中被设置的所有软中断.如果有软中断等待被处理,然后调用 <code>__do_softirq</code> .
+</p>
+
+<p>
+在关闭中断情况下(防止其他进程同时修改),重置当前的bitmap为0,也就是所有等待的软中断标志位被删除.之后打开中断,执行软中断处理函数.此间,允许
+bitmap在任何时候被修改.
+</p>
+
+<p>
+在 <code>softirq_vec</code> 中的处理函数在循环中为每个等待softIRQ调用.
+</p>
+
+<p>
+一旦所有标志的软中断被服务完,kernel检查是否有新的软中断同时被置位.如果有等待的软中断,并且重执行次数没有超过 <code>MAX_SOFTIRQ_RESTART</code> (基本是
+10),那么再次重新执行一遍.
+</p>
+
+<p>
+如果仍有等待的软中断在 <code>MAX_SOFTIRQ_RESTART</code> 次重新执行后,
+<code>wakeup_softirqd</code> 被调用来唤醒软中断后台程序.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">The SoftIRQ Daemon</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+软中断的后台程序任务是异步的执行软中断.每个处理器被分配它们各自的后台程序 <code>ksoftirqd</code>.
+</p>
+
+<p>
+<code>wakeup_softirqd</code> 在kernel的2处被调用来唤醒次后台程序:
+</p>
+<ul class="org-ul">
+<li>在 <code>do_softirq</code> 中.
+</li>
+<li>在 <code>raise_softirq_irqoff</code> 最后. 这个函数被 <code>raise_softirq</code> 内部调用.
+</li>
+</ul>
+
+<p>
+软中断的后台程序在系统启动时的 <code>init</code> 后通过 <code>initcall</code> 机制被调用.初始化完后,每个后台程序执行如下循环:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/softirq.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ksoftirqd</span>(<span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">__bind_cpu</span>)
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+    <span style="color: #00ffff;">while</span> (!kthread_should_stop()) {
+      <span style="color: #00ffff;">if</span> (!local_softirq_pending()) {
+        schedule();
+      }
+      __set_current_state(TASK_RUNNING);
+      <span style="color: #00ffff;">while</span> (local_softirq_pending()) {
+        do_softirq();
+        cond_resched();
+      }
+      set_current_state(TASK_INTERRUPTIBLE);
+    }
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+}
+</pre>
+</div>
+
+<p>
+每次它被唤醒,先检查是否有标志的软中断在等待,没有的话,调度给另外进程.
+</p>
+
+<p>
+如果有等待的软中断,后台程序去服务它们.在while循环中,两个函数
+<code>do_softirq</code> 和 <code>cond_resched</code> 被不断调用直到没有等待的软中断.
+<code>cond_resched</code> 确保调度器得到调用如果 <code>TIF_NEED_RESCHED</code> 设置到当前进程.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Tasklets</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+软中断由内核在静态表中固定使用,延迟机制相对复杂.因为软中断能同时和独立的在多个处理器上运行.这也是效率的关键所在,网络实现性能在多核系统显著的得到提高.但是,处理函数必须设计完全可重入并且线程安全.
+</p>
+
+<p>
+Tasklets和work queues是另外延迟执行任务的机制,它们的实现基于softIRQs,
+但是她们更容易使用,因此更适合设备驱动.
+</p>
+</div>
+
+<div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">Generating Tasklets</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+中心数据结构是 <code>tasklet_struct</code> ,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span>
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">next</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">state</span>;
+  <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">count</span>;
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">func</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>;
+};
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>从设备驱动程序来说,最重要的元素是 <code>func</code>.它指向需要延迟运行的函数.
+<code>data</code> 是作为传递参数.
+</li>
+<li><code>next</code> 用来建立一个tasklet的链表.允许多个任务等待被执行.
+</li>
+<li><code>state</code> 表明当前task的状态.只有2种选项,并且表示不同的bit位,可以独立设置和移除.
+<ul class="org-ul">
+<li><code>TASKLET_STATE_SCHED</code> 设置当tasklet被注册,并调度执行.
+</li>
+<li><code>TASKLET_STATE_RUN</code> 表明tasklet正在执行.
+</li>
+</ul>
+</li>
+<li><code>count</code> 被用来禁止已经调度过的tasklets.当它的值非0,相应的tasklet被忽略.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Registering Tasklets</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+<code>tasklet_schedule</code> 在系统中注册一个tasklet:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_schedule</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+</pre>
+</div>
+
+<p>
+如果 <code>TASKLET_STATE_SCHED</code> 被置位,注册终止因为这个tasklet已经被注册.否则,这个tasklet被放入CPU特定的链表 <code>tasklet_vec</code> 头部.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">Executing Tasklets</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+因为tasklet实现在softIRQ上,所以它们总是得到执行当软中断被处理时.
+Tasklets与软中断 <code>TASKLET_SOFTIRQ</code> 挂钩,所以调用
+<code>raise_softirq(TASKLET_SOFTIRQ)</code> 来执行当前处理器的tasklets在下次机会中.kernel使用 <code>tasklet_action</code> 作为tasklet软中断的执行函数.
+</p>
+
+
+<p>
+这个函数先获取要执行的CPU特定的list,把它从全局list中移除到本地.然后它们在如下循环中依次执行:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/softirq.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_action</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *<span style="color: #eedd82;">a</span>)
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+    <span style="color: #00ffff;">while</span> (list) {
+      <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span> = list;
+      list = list-&gt;next;
+      <span style="color: #00ffff;">if</span> (tasklet_trylock(t)) {
+        <span style="color: #00ffff;">if</span> (!atomic_read(&amp;t-&gt;count)) {
+          <span style="color: #00ffff;">if</span> (!test_and_clear_bit(TASKLET_STATE_SCHED, &amp;t-&gt;state))
+            BUG();
+          t-&gt;func(t-&gt;data);
+          tasklet_unlock(t);
+          <span style="color: #00ffff;">continue</span>;
+        }
+        tasklet_unlock(t);
+      }
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+    }
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+}
+</pre>
+</div>
+
+<p>
+在while循环中执行tasklets机制同处理softIRQs类似.
+</p>
+
+<p>
+因为一个tasklet只能同时在一个处理器上执行,但是其他tasklet能并行运行,tasklet特定的锁需要. <code>state</code> 的状态被使用来作为锁变量. 在tasklet的处理函数执行前,kernel使用 <code>tasklet_trylock</code> 来检查tasklet的状态是否是
+<code>TASKLET_STATE_RUN</code> ,也就是它是否已经在其他处理器上运行.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tasklet_trylock</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>)
+{
+  <span style="color: #00ffff;">return</span> !test_and_set_bit(TASKLET_STATE_RUN, &amp;(t)-&gt;state);
+}
+</pre>
+</div>
+
+<p>
+如果元素 <code>count</code> 非0, tasklet被认为未激活,代码不被执行.
+</p>
+
+<p>
+一旦两个检查都通过,kernel执行tasklet的处理函数通过调用
+<code>t-&gt;func(t-&gt;data)</code> .最终tasklet的 <code>TASKLET_SCHED_RUN</code> 位删除通过
+<code>tasklet_unlock</code>.
+</p>
+
+<p>
+如果在执行tasklets中,新的tasklets在当前处理器中等待,软中断
+<code>TASKLET_SOFTIRQ</code> 被触发来尽快执行新的tasklets.
+</p>
+
+<p>
+除了普通的tasklets. kernel使用第二中高优先级tasklet.它的实现与普通的
+tasklets基本一致,除了以下一些改变:
+</p>
+<ul class="org-ul">
+<li><code>HI_SOFTIRQ</code> 取代 <code>TASKLET_SOFTIRQ</code> 作为softIRQ. 它相应的处理函数是
+<code>tasklet_hi_action</code> .
+</li>
+<li>注册的tasklets队列如CPU特定的变量 <code>tasklet_hi_vec</code> 中,通过使用
+<code>tasklet_hi_schedule</code> .
+</li>
+</ul>
+
+<p>
+高优先级意味着 <code>HI_SOFTIRQ</code> 的软中断执行在所有其他处理之前&#x2013;特别在网络处理之前.现在,大多声卡驱动使用此机制,因为延后太长会影响音效质量.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">Example</h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+<a href="./Files/tasklet-examples.tar.gz">源码包下载</a>.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>       
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/kernel.h&gt;</span>       
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/sched.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/interrupt.h&gt;</span>
+
+MODULE_LICENSE(<span style="color: #ffa07a;">"GPL"</span>);
+MODULE_DESCRIPTION(<span style="color: #ffa07a;">"tasklet examples"</span>);
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_func</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">arg</span>) {
+  printk(KERN_INFO <span style="color: #ffa07a;">"tasklet function %lu"</span>, arg);
+}
+DECLARE_TASKLET(task_test1, tasklet_func, 1);
+DECLARE_TASKLET_DISABLED(task_test2, tasklet_func, 2);
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span> tasklet_example_init(<span style="color: #98fb98;">void</span>) {
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task1 is %ld and count is %d\n"</span>,
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task2 is %ld and count is %d\n"</span>,
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"enable task2\n"</span>);
+  tasklet_enable(&amp;task_test2);
+  printk(KERN_INFO <span style="color: #ffa07a;">"after enable, the state of task2 is %ld and count is %d\n"</span>,
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"schedule tasklets\n"</span>);
+  tasklet_schedule(&amp;task_test1);
+  tasklet_schedule(&amp;task_test2);
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task1 is %ld and count is %d\n"</span>,
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task2 is %ld and count is %d\n"</span>,
+         task_test2.state, task_test2.count);
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__exit</span> tasklet_example_exit(<span style="color: #98fb98;">void</span>) {
+  printk(KERN_INFO <span style="color: #ffa07a;">"tasklet exit\n"</span>);
+}
+module_init(tasklet_example_init);
+module_exit(tasklet_example_exit);
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">obj-m += tasklet_example.o
+
+all:
+        make -C /lib/modules/$(shell uname -r)/build <span style="color: #eedd82;">M</span>=$(PWD) modules
+
+clean:
+        make -C /lib/modules/$(shell uname -r)/build <span style="color: #eedd82;">M</span>=$(PWD) clean
+</pre>
+</div>
+
+<p>
+run:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ make
+$ sudo insmod ./tasklet_example.ko 
+$ dmesg | tail
+[758618.602354] the state of task1 is 0 and count is 0
+[758618.602356] the state of task2 is 0 and count is 1
+[758618.602357] enable task2
+[758618.602358] after enable, the state of task2 is 0 and count is 0
+[758618.602359] schedule tasklets
+[758618.602362] the state of task1 is 1 and count is 0
+[758618.602363] the state of task2 is 1 and count is 0
+[758618.602426] tasklet <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">1</span>
+[758618.602427] tasklet <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">2</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Wait queues and completions</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待时进入睡眠,当时间发生时自动由kernel唤醒.Completion建立于wati queues之上,并被用来等待某个动作的结束.
+</p>
+</div>
+
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Wait Queues</h3>
+<div class="outline-text-3" id="text-5-1">
+</div><ul class="org-ul"><li><a id="sec-5-1-1" name="sec-5-1-1"></a>Data Structures<br  /><div class="outline-text-4" id="text-5-1-1">
+<p>
+每个wait queue都有一个头部如下表示:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue_head</span> {
+  <span style="color: #98fb98;">spinlock_t</span> <span style="color: #eedd82;">lock</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">task_list</span>;
+};
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue_head</span> <span style="color: #98fb98;">wait_queue_head_t</span>;
+</pre>
+</div>
+
+<p>
+因为wait queues能在中断中被修改,所以spinlock需要获取在修改它前.
+</p>
+
+<p>
+队列中的元素如下结构:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue</span> {
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">private</span>;
+  <span style="color: #98fb98;">wait_queue_func_t</span> <span style="color: #eedd82;">func</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">task_list</span>;
+};
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue</span> <span style="color: #98fb98;">wait_queue_t</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>flags</code> 有值 <code>WQ_FLAG_EXCLUSIVE</code> 或没有. 标识 <code>WQ_FLAG_EXCLUSIVE</code> 表明等待进程互斥的被唤醒.
+</li>
+<li><code>private</code> 指向等待进程的task结构. 这个变量基本能指向任意似有数据,但是kernel很少使用.
+</li>
+<li><code>func</code> 当唤醒时被调用.
+</li>
+<li><code>task_list</code> 是list元素,被用来把此元素放入等待队列.
+</li>
+</ul>
+
+<p>
+Wait queue分为两部分:
+</p>
+<ol class="org-ol">
+<li>把当前进程放入wait queue而睡眠,通过调用 <code>wait_event</code> 函数.
+</li>
+<li>在kernel的另外地方,调用 <code>wake_up</code> 函数唤醒等待的进程.
+</li>
+</ol>
+</div>
+</li>
+<li><a id="sec-5-1-2" name="sec-5-1-2"></a>Putting Processes to Sleep<br  /><div class="outline-text-4" id="text-5-1-2">
+<p>
+函数 <code>add_wait_queue</code> 被使用来把一个task加入到等待队列,这个函数在获取
+spinlock后把工作交给 <code>__add_wait_queue</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__add_wait_queue</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">head</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">new</span>)
+{
+  list_add(&amp;new-&gt;task_list, &amp;head-&gt;task_list);
+}
+</pre>
+</div>
+
+<p>
+使用list函数 <code>list_add</code> 把新task加入到等待队列中.
+</p>
+
+<p>
+<code>add_wait_queue_exclusive</code> 基本一样,只是同时设置 <code>WQ_EXCLUSIVE</code> 标识.
+</p>
+
+<p>
+另外方法是 <code>prepare_to_wait</code>, 并还需要task状态作为参数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/wait.c</span>
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">prepare_to_wait</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+
+        wait-&gt;flags &amp;= ~WQ_FLAG_EXCLUSIVE;
+        spin_lock_irqsave(&amp;q-&gt;lock, flags);
+        <span style="color: #00ffff;">if</span> (list_empty(&amp;wait-&gt;task_list))
+                __add_wait_queue(q, wait);
+        set_current_state(state);
+        spin_unlock_irqrestore(&amp;q-&gt;lock, flags);
+}
+</pre>
+</div>
+
+<p>
+<code>prepare_to_wait_exclusive</code> 同样是设置 <code>WQ_FLAG_EXCLUSIVE</code> 标识的版本.
+</p>
+
+<p>
+有2个标准的方法来初始化等待队列节点:
+</p>
+<ol class="org-ol">
+<li><code>init_waitqueue_entry</code> 动态初始化 <code>wait_queue_t</code> 实例:
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">init_waitqueue_entry</span>(<span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">q</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *<span style="color: #eedd82;">p</span>)
+{
+        q-&gt;flags = 0;
+        q-&gt;private = p;
+        q-&gt;func = default_wake_function;
+}
+</pre>
+</div>
+</li>
+<li><code>DEFINE_WAIT</code> 静态的初始化一个 <code>wait_queue_t</code> 实例:
+<div class="org-src-container">
+
+<pre class="src src-c">     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DEFINE_WAIT</span>(<span style="color: #eedd82;">name</span>) DEFINE_WAIT_FUNC(name, autoremove_wake_function)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DEFINE_WAIT_FUNC</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">function</span>)                                \
+  <span style="color: #98fb98;">wait_queue_t</span> <span style="color: #eedd82;">name</span> = {                                                 \
+    .private        = current,                                          \
+    .func           = function,                                         \
+    .task_list      = LIST_HEAD_INIT((name).task_list),                 \
+  }
+</pre>
+</div>
+</li>
+</ol>
+
+<p>
+<code>add_wait_queue</code> 一般不直接使用.通常使用 <code>wait_event</code>. 这个宏有两个参数:
+</p>
+<ol class="org-ol">
+<li>等待的队列.
+</li>
+<li>等待时间的表达式.
+</li>
+</ol>
+
+<p>
+宏确保等待情况没有被满足,若已满足,处理立刻停止,因此没有什么东西可以等待.wait的主要工作由 <code>__wait_event</code> 定义:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>)                                       \
+<span style="color: #00ffff;">do</span> {                                                                    \
+        <span style="color: #00ffff;">if</span> (condition)                                                  \
+                <span style="color: #00ffff;">break</span>;                                                  \
+        __wait_event(wq, condition);                                    \
+} <span style="color: #00ffff;">while</span> (0)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__wait_event</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>)                                     \
+<span style="color: #00ffff;">do</span> {                                                                    \
+        DEFINE_WAIT(__wait);                                            \
+                                                                        \
+        <span style="color: #00ffff;">for</span> (;;) {                                                      \
+                prepare_to_wait(&amp;wq, &amp;__wait, TASK_UNINTERRUPTIBLE);    \
+                <span style="color: #00ffff;">if</span> (condition)                                          \
+                        <span style="color: #00ffff;">break</span>;                                          \
+                schedule();                                             \
+        }                                                               \
+        finish_wait(&amp;wq, &amp;__wait);                                      \
+} <span style="color: #00ffff;">while</span> (0)
+</pre>
+</div>
+
+<p>
+在用 <code>DEFINE_WAIT</code> 设置好等待队列元素后,宏产生一个无尽的循环.使用
+<code>prepare_to_wai</code> 让此进程在此等待队列上睡眠.每次它唤醒,都检查特定的条件是否满足,若是则离开循环.否则,交给调度器,自己继续睡眠.
+</p>
+
+<p>
+当条件得到满足后, <code>finish_wait</code> 把task状态重新设置回 <code>TASK_RUNNING</code> 并把它从等待队列中移除.
+</p>
+
+<p>
+除了 <code>wait_event</code>, kernel定义其他一些宏来让当前进程等待:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event_interruptible</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event_timeout</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>, <span style="color: #eedd82;">timeout</span>) { ... }
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event_interruptible_timeout</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>, <span style="color: #eedd82;">timeout</span>)
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>wait_event_interruptible</code> 设置当前进程 <code>TASK_INTERRUPTIBLE</code>.睡眠中的进程能被接收的signal所唤醒.
+</li>
+<li><code>wait_event_timeout</code> 等待特定条件满足,但是在已jiffies为单位的超时后停止等待.
+</li>
+<li><code>wait_event_interruptible_timeout</code> 既可被接收的signal所唤醒,并超时等待.
+</li>
+</ul>
+</div>
+</li>
+
+<li><a id="sec-5-1-3" name="sec-5-1-3"></a>Waking Processes<br  /><div class="outline-text-4" id="text-5-1-3">
+<p>
+kernel定义了一系列宏来唤醒等待队列中的进程,它们都基于同一个函数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_nr</span>(<span style="color: #eedd82;">x</span>, <span style="color: #eedd82;">nr</span>) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_all</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_interruptible</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_INTERRUPTIBLE, 1, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_interruptible_nr</span>(<span style="color: #eedd82;">x</span>, <span style="color: #eedd82;">nr</span>) __wake_up(x, TASK_INTERRUPTIBLE, nr, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_interruptible_all</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_INTERRUPTIBLE, 0, <span style="color: #7fffd4;">NULL</span>)
+</pre>
+</div>
+<p>
+在获取必要的等待队列头的锁后, <code>__wake_up</code> 把工作交给
+<code>__wake_up_common</code> :
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/sched.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__wake_up_common</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mode</span>,
+                             <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nr_exclusive</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sync</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">key</span>)
+{
+  <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">curr</span>, *<span style="color: #eedd82;">next</span>;
+
+  <span style="color: #eedd82;">list_for_each_entry_safe</span>(<span style="color: #98fb98;">curr</span>, <span style="color: #98fb98;">next</span>, &amp;q-&gt;task_list, <span style="color: #98fb98;">task_list</span>) {
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">flags</span> = curr-&gt;flags;
+
+    <span style="color: #00ffff;">if</span> (curr-&gt;func(curr, mode, wake_flags, key) &amp;&amp;
+        (flags &amp; WQ_FLAG_EXCLUSIVE) &amp;&amp; !--nr_exclusive)
+      <span style="color: #00ffff;">break</span>;
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-5-1-4" name="sec-5-1-4"></a>Example<br  /><div class="outline-text-4" id="text-5-1-4">
+<p>
+<a href="./Files/wait_queue_example.tar.gz">源码包下载</a>.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/miscdevice.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/uaccess.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/wait.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/sched.h&gt;</span>
+
+MODULE_LICENSE(<span style="color: #ffa07a;">"GPL"</span>);
+MODULE_DESCRIPTION(<span style="color: #ffa07a;">"wait queue example module"</span>);
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">wait_queue_head_t read_wait_queue;</span>
+DECLARE_WAIT_QUEUE_HEAD(read_wait_queue);
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">read_flag</span> = 0;
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">ssize_t</span> <span style="color: #87cefa;">buffer_read</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> * <span style="color: #eedd82;">file</span>, <span style="color: #98fb98;">char</span> * <span style="color: #eedd82;">buf</span>, 
+                          <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">loff_t</span> *<span style="color: #eedd82;">ppos</span>) {
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"read finished\n"</span>;
+  <span style="color: #98fb98;">ssize_t</span> <span style="color: #eedd82;">ret</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span> = strlen(str);
+  printk(KERN_INFO <span style="color: #ffa07a;">"prepare to read\n"</span>);
+  wait_event_interruptible(read_wait_queue, read_flag != 0);
+  printk(KERN_INFO <span style="color: #ffa07a;">"reader woken up\n"</span>);
+  read_flag = 0;
+  ret = copy_to_user(buf, str, len);
+  <span style="color: #00ffff;">return</span> ret;
+}
+
+<span style="color: #98fb98;">ssize_t</span> <span style="color: #87cefa;">buffer_write</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *<span style="color: #eedd82;">file</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">buff</span>,
+                     <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">loff_t</span> *<span style="color: #eedd82;">offp</span>) {
+  <span style="color: #98fb98;">ssize_t</span> <span style="color: #eedd82;">ret</span>;
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">str</span>[100];
+  printk(KERN_INFO <span style="color: #ffa07a;">"writer to woke up reader\n"</span>);
+  read_flag = 1;
+  wake_up_interruptible(&amp;read_wait_queue);
+  ret = copy_from_user(str, buff, 100);
+  <span style="color: #00ffff;">return</span> ret;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> <span style="color: #eedd82;">buffer_fops</span> = {
+        .owner          = THIS_MODULE,
+        .read           = buffer_read,
+        .write          = buffer_write,
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">miscdevice</span> <span style="color: #eedd82;">wait_test_dev</span> = {
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * kernel to just pick minor number.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        MISC_DYNAMIC_MINOR,
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Name ourselves /dev/hello.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #ffa07a;">"wait_test"</span>,
+        &amp;buffer_fops
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span> wait_test_init(<span style="color: #98fb98;">void</span>) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ret</span>;
+        ret = misc_register(&amp;wait_test_dev);
+        <span style="color: #00ffff;">if</span> (ret)
+                printk(KERN_ERR
+                       <span style="color: #ffa07a;">"Unable to register wait test misc device\n"</span>);
+        <span style="color: #00ffff;">return</span> ret;
+}
+module_init(wait_test_init);
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__exit</span> wait_test_exit(<span style="color: #98fb98;">void</span>) {
+        misc_deregister(&amp;wait_test_dev);
+}
+module_exit(wait_test_exit);
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Completions</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+Completions的实现基于如上的wait queues.Wait queue是等待某个条件得到满足,而Completion仅等待结构体中 <code>done</code> 得到满足.可以说是对wait queue等待某个完成的简易封装.使用如下数据结构:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;completion.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> {
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">done</span>;
+  <span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">wait</span>;
+};
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>done</code> 用来标示某个时间完成以让其他进程等待这个完成.
+</li>
+<li><code>wait</code> 是可以被放入睡眠的wait queue.
+</li>
+</ul>
+
+<p>
+<code>DECLARE_COMPLETION</code> 和 <code>init_completion</code> 分别静态和动态初始化
+<code>completion</code> 实例.
+</p>
+
+<p>
+进程被加入到list中使用 <code>wait_for_completion</code>, 它们在这list中等待直到它们的请求得到处理.如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;completion.h&gt;</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait_for_completion</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">wait_for_completion_interruptible</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>);
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">wait_for_completion_timeout</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>,
+                                          <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeout</span>);
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">wait_for_completion_interruptible_timeout</span>(
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeout</span>);
+</pre>
+</div>
+
+<p>
+一旦请求被kernel其他部分得到处理, <code>complete</code> 或 <code>complete_all</code> 必须被调用来唤醒等待的进程. <code>complete</code> 每次只移除一个进程从completion list中,所以想一次移除n个等待的进程,必须调用此函数n次.或者,一次唤醒和移除所有等待进程. <code>complete_and_exit</code> 是个微小的封装,先应用 <code>complete</code> 然后调用
+<code>do_exit</code> 来完成kernle线程.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;completion.h&gt;</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">complete</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">complete_all</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *);
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/exit.c</span>
+NORET_TYPE <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">complete_and_exit</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">comp</span>, <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">code</span>);
+</pre>
+</div>
+
+<p>
+每次 <code>complete</code> 被调用, <code>done</code> 被增加1, <code>wait_for</code> 函数只使调用者睡眠当 <code>done</code> 等于0时. <code>complete_all</code> 类似,但是设置 <code>done</code> 为可能的最大值(
+<code>UINT_MAX/2</code> ).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Work Queues</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+Work queues延迟执行任务.相当于后台进程,它能随意睡眠才执行.
+</p>
+
+<p>
+对于每个work queue, kernel产生一个新的kernel后台进程,使用wait queue机制来延后执行任务.
+</p>
+
+<p>
+一个新的wait queue通过调用下面函数之一生成: <code>create_workqueue</code> 或
+<code>create_workqueue_singlethread</code> .第一个函数在所有CPU上创建一个worker
+thread. 后一个在第一个CPU上创建一个thread.两者内部都使用
+<code>__create_workqueue_key</code> :
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/workqueue.c</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__create_workqueue</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">singlethread</span>, <span style="color: #eedd82;">freezeable</span>, <span style="color: #eedd82;">rt</span>)  \
+        __create_workqueue_key((name), (singlethread), (freezeable), (rt), \
+                               <span style="color: #7fffd4;">NULL</span>, <span style="color: #7fffd4;">NULL</span>)
+</pre>
+</div>
+
+<p>
+<code>name</code> 是产生的后台进程在进程列表中显示的名字.如果 <code>singlethread</code> 设置为0, 在每个CPU中都创建一个线程,否则就只在第一个.
+</p>
+
+<p>
+被放入wait queue中的任务必须封装成 <code>work_struct</code> 结构:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;workqueue.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span>;
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">void</span> (*<span style="color: #98fb98;">work_func_t</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> {
+  <span style="color: #98fb98;">atomic_long_t</span> <span style="color: #eedd82;">data</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">entry</span>;
+  <span style="color: #98fb98;">work_func_t</span> <span style="color: #eedd82;">func</span>;
+}
+</pre>
+</div>
+
+<p>
+<code>func</code> 指向要延迟执行的函数.这个并把指向本身 <code>work_struct</code> 的指针作为参数,这样允许函数从中获取到 <code>data</code> 元素.
+</p>
+
+<p>
+为什么kernel使用 <code>atomic_long_t</code> 作为数据指针的类型,而不是 <code>void*</code> 呢?
+实际上,之前的kernel版本定义 <code>work_struct</code> 如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;workqueue.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> {
+  ...
+  <span style="color: #98fb98;">void</span> (*func)(<span style="color: #98fb98;">void</span> *);
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>;
+  ...
+};
+</pre>
+</div>
+
+<p>
+<code>data</code> 如希望一样是指针类型.但是kernel使用了小技巧,存储更多信息到结构中而不用花费更多内存.因为指针以4字节对齐在所有架构上,首2个比特位保证是
+0.因此使用它们来包含更多的标识位,余下的比特位继续包含指针信息.如下的宏用来提取标识位:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;workqueue.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">WORK_STRUCT_FLAG_MASK</span> (3UL)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">WORK_STRUCT_WQ_DATA_MASK</span> (~WORK_STRUCT_FLAG_MASK)
+</pre>
+</div>
+
+<p>
+现在只有一个标识被定义: <code>WORK_STRUCT_PENDING</code> 允许检查一个可延迟的work
+当前是否被挂起还是没有.辅助宏 <code>work_pending(work)</code> 用来检查这个位. 原子类型确保修改而不用担心并行问题.
+</p>
+
+<p>
+kernel提供宏 <code>INIT_WORK(work, func)</code> 来初始化这个结构,如果参数需要,必须在之后再设置.
+</p>
+
+<p>
+此 <code>work_struct</code> 在未定义的时间后运行(当调度器选择这个后台进程运行).
+</p>
+
+<p>
+为了确保work queue 在 <b>之后</b> 特定时间才执行, <code>work_struct</code> 需要一个
+timer.解决方法如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;workqueue.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> <span style="color: #eedd82;">work</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timer_list</span> <span style="color: #eedd82;">timer</span>;
+};
+</pre>
+</div>
+
+<p>
+把两者加入work queue的放入如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/workqueue.c</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">fastcall</span> queue_work(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">wq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>)
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">fastcall</span> queue_delayed_work(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">wq</span>,
+                                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> *<span style="color: #eedd82;">dwork</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">delay</span>)
+</pre>
+</div>
+
+<p>
+<code>queue_delayed_work</code> 先产生一个超时是 <code>delayed</code> jiffies的kernel timer,
+相应的处理函数是使用 <code>queue_work</code> 把work加入到work queue中.
+</p>
+
+<p>
+kernel产生一个标准的叫 <code>keventd_wq</code> 的wait queue.这个queue可以被所有
+kernel中不值得创建一个独立work queue的部分使用. 并有如下两个函数实现把新的work加入这个标准queue中:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">keventd_wq</span> __read_mostly;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/workqueue.c</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">schedule_work</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>)
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">schedule_delayed_work</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delay_work</span> *<span style="color: #eedd82;">dwork</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">delay</span>)
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2014-12-12 Fri 22:30</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

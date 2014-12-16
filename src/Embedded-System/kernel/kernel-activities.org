@@ -1,0 +1,1433 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Hardware/Software IRQs, tasklets and wait queues
+#+OPTIONS: num:nil H:2
+
+
+* Interrupts
+Linux中2种不同的中断:
++ Hardware Interrupts: 又系统和连接的外围设备做产生.
++ SoftIRQs: 在kernel本身被用来有效实现延迟的活动.
+
+** Interrupt Types
+总的来说,中断类型可以被分为2类:
++ Synchronous Interrupts 和 Exceptions: 由CPU自身产生,并用户当前运行的
+  程序.Exceptions 由许多原因触发:在运行时产生程序错误(经典例子是除
+  0).或异常情况发生,处理器需要外部的帮助解决它.
++ Asynchronous interrupts: 是由外围设备产生的经典中断,可以在任何时候发
+  生.与synchronous interrupts不同, asynchronous interrupts不和特定进程
+  相关.它能在任何时候发生(中断打开情况下),无论当前系统运行什么活动.
+
+如果CPU当前没有在kernel模式下,它会从用户模式跳转到内核模式.然后它执行
+一个特定的程序叫做 interrupt service routine(ISR) 或 interrupt
+handler.
+
+* Hardware IRQs
+中断其实不能直接被处理器外部设备触发,而它被请求是在一个叫interrupt controller
+的标准元件的帮助下.所以外部设备只能请求中断通过此元件,这样的请求被熟知
+为IRQs或interrupt requests.
+** Processing Interrupts
+一旦CPU被通知有中断,它需要转到相应的软件程序去进一步处理.因为每个
+interrupt和每个exception有为一个编号,kernel使用一张表来包含指向处理函
+数的指针.如下图:
+
+[[./Files/interrupt handlers.jpeg]]
+
+*** Entry and Exit Tasks
+如下图,interrupt处理被分为3部分.首先,适合处理函数能运行的环境被设置好;
+然后处理函数本身被调用;最后系统恢复到interrupt前的状态.
+
+[[./Files/handing-an-interrupt.jpeg]]
+
+进入和离开中断处理程序确保处理器从用户模式转到kernel模式.进入代码中关
+键部分是从用户模式的stack转化到kernel模式的stack,离开代码相反.所以必须
+保存当前寄存器的值,平台相关的寄存器list结构 =pt_regs= 中列出了所有在
+kernel模式下会改变的寄存器.
+
+离开代码中kernel检查是否:
++ 调度器需要选择一个新的进程来取代旧的进程.
++ 有需要传递给进程的信号.
+
+因为C和汇编语言的交互需要,特别两者数据交换,这些处理代码在
+=arch/arch/kernel/entry.S= 中.
+
+** Data Structures
+管理IRQs中心是一张每个条目就是一个IRQ的全局的数组.因为数组位置和中断编
+号是一致的.所以很容易通过特定IRQ确定条目位置: IRQ 0的位置是0如此.数组
+定义如下:
+#+begin_src c
+  // kernel/irq/handle.c
+  struct irq_desc irq_desc[NR_IRQS] __cacheline_aligned_in_smp = {
+    [0 ... NR_IRQS-1] = {
+      .status = IRQ_DISABLED,
+      .chip = &no_irq_chip,
+      .handle_irq = handle_bad_irq,
+      .depth = 1,
+      // ...
+    }
+  };
+#+end_src
+
+尽管使用架构不相关的数据类型,但是最大支持IRQs个数由平台特定定值
+=NR_IRQS= 决定.对于大多数架构来说,这个定值被定义在处理器特定的头文件
+=include/asm-arch/irq.h= 中.初始,所有中断条目没有安装指定的处理函数,使
+用 =handle_bad_irq= 作为处理函数,它仅仅确认终端.
+
+Kernel的IRQ处理子系统包含3个抽象层,如下图:
+
+[[./Files/various-interrupt-handlers.jpeg]]
+
+1. *High-Level Interrupt Service Routines (ISRs)*: 进行由设备驱动中断
+   引发的必要工作.
+2. *Interrupt Flow Handling*: 处理中断不同类型如边缘和电平触发间的差异.
+3. *Chip-Level Hardware Encapsulation*: 直接与底层产生中断的硬件交互.
+
+继续分析代码,表示IRQ描述符的结构定义如下:
+
+#+begin_src c
+  // <irq.h>
+  struct irq_desc {
+    irq_flow_handler_t handle_irq;
+    struct irq_chip *chip;
+    void *handler_data;
+    void *chip_data;
+    struct irqaction *action; /* IRQ action list */
+    unsigned int status; /* IRQ status */
+    unsigned int depth; /* nested irq disables */
+    unsigned int irq_count; /* For detecting broken IRQs */
+    unsigned int irqs_unhandled;
+    ...
+    const char *name;
+  } ____cacheline_internodealigned_in_smp;
+#+end_src
+
++ flow层的IRQ处理函数由 =handle_irq= 提供. =handler_data= 可以指向处理
+  特定的数据. =handle_irq= 被调用当中断发生时.这个函数并负责使用
+  =chip= 提供的控制特定方法来完成必要的底层操作来进行中断处理.
++ =action= 提供一串当中断发生时需要被执行的动作.
++ 芯片特定的处理封装在 =chip= 中.一个特殊的数据结构被引入, =chip_data=
+  指向相应使用的数据.
++ =name= 指定 =/proc/interrupts= 中显示的名字.
+
+其中 =depth= 有2个功能,用来指示IRQ线是否打开或关闭,并且记录被关闭的次
+数. 一个正数表示被关闭.而0表示被打开.为什么正数被使用来关闭IRQs?因为每
+次有代码关闭中断, =depth= 作为计数加1, 每次中断被再次打开, 计数减1.
+
+IRQ能改变它的状态不仅在初始化时,而且可以在运行时. =status= 描述当前状
+态. =<irq.h>= 定义了许多定值来描述当前IRQ线的状态.
+
++ =IRQ_DISABLED= is used for an IRQ line disabled by a device driver.
+  It instructs the kernel not to enter the handler.
++ During execution of an IRQ handler the state is set to
+  =IRQ_INPROGRESS=.As with =IRQ_DISABLED=, this prohibits the
+  remaining kernel code from executing the handler.
++ =IRQ_PENDING= is active when the CPU has noticed an interrupt but has
+  not yet executed the corresponding handler.
++ =IRQ_MASKED= is required to properly handle interrupts that occur
+  during interrupt processing;
++ =IRQ_PER_CPU= is set when an IRQ can occur on a single CPU only. (On
+  SMP systems this renders several protection mechanisms against
+  concurrent accesses superfluous.)
++ =IRQ_LEVEL= is used on Alpha and PowerPC to differentiate
+  level-triggered and edge-triggered IRQs.
++ =IRQ_REPLAY= means that the IRQ has been disabled but a previous
+  interrupt has not yet been acknowledged.
++ =IRQ_AUTODETECT= and =IRQ_WAITING= are used for the automatic
+  detection and configuration of IRQs. I will not discuss this in more
+  detail, but mention that the respective code is located in =kernel/irq/autoprobe.c=.
++ =IRQ_NOREQUEST= is set if the IRQ can be shared between devices and
+  must thus not be exclusively requested by a single device.
+
+使用 =status= 的当前内容,很容易让kernel查询特定IRQ的状态而不用知道硬件
+特定的底层实现.但仅仅设置相应的标识不能产生任何效果,底层的硬件必须被告
+知状态的改变.
+
+*** IRQ Controller Abstraction
+芯片特性的控制被封装在结构 =struct irq_chip= 中,基本如下:
+#+begin_src c
+  // <irq.h>
+  struct irq_chip {
+    const char *name;
+    unsigned int (*startup)(unsigned int irq);
+    void (*shutdown)(unsigned int irq);
+    void (*enable)(unsigned int irq);
+    void (*disable)(unsigned int irq);
+    void (*ack)(unsigned int irq);
+    void (*mask)(unsigned int irq);
+    void (*mask_ack)(unsigned int irq);
+    void (*unmask)(unsigned int irq);
+    void (*eoi)(unsigned int irq);
+    // ...
+    int (*set_type)(unsigned int irq, unsigned int flow_type);
+  };
+#+end_src
+
+这个结构需要考虑到不同IRQ实现的特性.
+
+=name= 维护一个硬件控制器的标识.IA-32系统可能的值是‘‘XTPIC‘‘ 和 ‘‘IO-APIC,’’.
+
+其他函数指针有如下意思:
++ =startup= 指向用来第一次初始化IRQ的函数.
++ =enable= 使能IRQ.
++ =disable= 是IRQ无效化,而 =shutdown= 彻底关闭中断源.
++ =ack= 与中断控制的硬件紧密相连.在一些模式下,IRQ请求的到达必须得到确
+  认以至之后的请求才能被服务.
++ =end= 被调用来标志中断处理的结束.
++ 在多核系统中, =set_affinity= 可以被用来声明特定IRQs由某个CPU处理.
++ =set_type= 用来设置IRQ flow类型.
+
+以IO-APIC为例子:
+
+#+begin_src c
+// arch/x86/kernel/apic/io_apic.c
+static struct irq_chip ioapic_chip __read_mostly = {
+	.name		= "IO-APIC",
+	.startup	= startup_ioapic_irq,
+	.mask		= mask_IO_APIC_irq,
+	.unmask		= unmask_IO_APIC_irq,
+	.ack		= ack_apic_edge,
+	.eoi		= ack_apic_level,
+#ifdef CONFIG_SMP
+	.set_affinity	= set_ioapic_affinity_irq,
+#endif
+	.retrigger	= ioapic_retrigger_irq,
+};
+#+end_src
+
+在系统中查看中断统计信息:
+
+#+begin_src sh
+$ cat /proc/interrupts 
+           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5       CPU6       CPU7       
+  0:         41          0          0   31487034          0          0          0          0   IO-APIC-edge      timer
+  1:          1          0          0          2          0          0          0          0   IO-APIC-edge      i8042
+  4:          0          0          0          8          0          0          0          0   IO-APIC-edge    
+  8:          0          0          0          1          0          0          0          0   IO-APIC-edge      rtc0
+  9:          0          0          0          0          0          0          0          0   IO-APIC-fasteoi   acpi
+ 12:          0          0          0          4          0          0          0          0   IO-APIC-edge      i8042
+ 16:         10          0          0          0          0          0         40          0   IO-APIC-fasteoi   ehci_hcd:usb1
+ 17:         91          0          0          0          0          0          0        148   IO-APIC-fasteoi   snd_hda_intel
+ 23:    6420912          0          0          0          0          0        141          0   IO-APIC-fasteoi   ehci_hcd:usb2
+#+end_src
+
+*** Handler Function Representation
+其中有 =irqaction= 结构如下:
+#+begin_src c
+  // <interrupt.h>
+  struct irqaction {
+    irq_handler_t handler;
+    unsigned long flags;
+    const char *name;
+    void *dev_id;
+    struct irqaction *next;
+  }
+#+end_src
+
+其中最重要的元素是处理函数 =irq_handler_t handler= , 当设备请求系统中
+断时,这个处理函数被调用. =flag= 描述IRQ的一些特性,如下被定义在
+=<interrupt.h>= :
+
++ =IRQF_SHARED= is set forshared IRQsand signals that more than one
+  device is using an IRQ line.
++ =IRQF_SAMPLE_RANDO= is set when the IRQ contributes to the kernel
+  entropy pool.
++ =IRQF_DISABLED= indicates that the IRQ handler must be executed with
+  interrupts disabled.
++ =IRQF_TIMER= denotes a timer interrupt.
+
+next被使用来实现共享IRQ处理.一些 =irqaction= 实例被分组成一个链表.同一
+个链表的所有元素必须处理同一个IRQ编号.如下图描述它们如何相连:
+
+[[./Files/irq-management.jpeg]]
+** Interrupt Flow Handling
+*** Setting Controller Hardware
+kernel提供的注册 =irq_chip= 和设置flow处理的函数:
+
+#+begin_src c
+  // <irq.h>
+  int set_irq_chip(unsigned int irq, struct irq_chip *chip);
+  void set_irq_handler(unsigned int irq, irq_flow_handler_t handle);
+  void set_irq_chained_handler(unsigned int irq, irq_flow_handler_t handle)
+  void set_irq_chip_and_handler(unsigned int irq, struct irq_chip *chip,
+                                irq_flow_handler_t handle);
+  void set_irq_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
+                                     irq_flow_handler_t handle, const char *name);
+#+end_src
+
++ =set_irq_chip= 把IRQ芯片以 =irq_chip= 实例附加到特定中断上. 如果是
+  NULL,那么使用通用值 =no_irq_chip=.
++ =set_irq_handler= 和 =set_irq_chained_handler= 设置flow处理函数给特
+  定IRQ编号.
++ =set_chip_and_handler= 同时设置两者.
+*** Flow Handling
+在分析flow处理实现前,先看怎么定义自己的类型. =irq_flow_handler_t= 指定
+IRQ flow处理函数:
+
+#+begin_src c
+  // <irq.h>
+  typedef void fastcall (*irq_flow_handler_t)(unsigned int irq,
+                                              struct irq_desc *desc);
+#+end_src
+
+Flow处理函数获取IRQ的编号和对此中断负责的 =irq_desc= 实例.不同硬件需要
+不同的flow处理方法: 比如边沿(edge)和电平(levle)触发需要不同的处理方
+法.kernel提供一些默认的flow处理对不同类型.它们有一个共同点: 每个flow处
+理最后都会调用高层IRQs. =handle_IRQ_event= 负责调用上层处理.
+**** Edge-Triggered Interrupts
+边沿触发的默认处理是 =handle_edge_irq= .代码流程如下:
+
+[[./Files/handle-edge-irq.jpeg]]
+**** Level-Triggered Interrupts
+和边沿触发相比,电平触发处理相对简单点.代码流程如下:
+[[./Files/handle-level-irq.jpeg]]
+**** Other Types of Interrupts
+kernel还提供一些其他默认的flow处理:
++ 在IRQ处理完后,只有一个芯片特定的函数需要被调用: =chip->eoi=.默认的函
+  数是 =handle_fasteoi_irq=.
++ 没有flow控制的简单中断由 =handle_simple_irq= 处理.
++ 对于每个CPU的IRQs,IRQs只能在多核系统中某个特定的CPU处理由
+  =handle_percpu_irq= 完成.
+** Initializing and Reserving IRQs
+*** Registering IRQs
+设备驱动动态的注册IRQ可以通过如下函数:
+
+#+begin_src c
+  // kernel/irq/manage.c
+  int request_irq(unsigned int irq,
+                  irqreturn_t handler,
+                  unsigned long irqflags, const char *devname, void *dev_id)
+#+end_src
+
+如下是它的代码流程:
+
+[[./Files/request-irq.jpeg]]
+*** Freeing IRQs
+移除IRQ的函数 =remove_irq= 在 =kernel/irq/manage.c= 中,并通过调用函数
+=__free_irq= 完成.
+
+1. 对于每个IRQ,可以有多个行为共享它,所以单单IRQ编号不能识别指定IRQ,同
+   时需要 =dev_id=, 所以一开始扫描行为列表,找到相应IRQ条目.
+2. 若硬件相关的 =chip->shutdown= 函数存在,调用它,若不存在,就调用
+   =chip->disable=,
+3. 释放与此IRQ相关的数据结构.
+*** Registering Interrupts
+上面分析的是由系统外围注册和产生中断的机制.但是kernel还必须处理来自它
+本身的进程或用户进程执行的软件所触发的中断.与IRQs相比,kernle不需要提供
+动态注册中断处理的接口.因为使用个数在初始化时就知道并且之后不会改变.注
+册中断,异常,和traps在kernel初始化时进行,并且它们的预留部分不再改变在运
+行时.
+
+当一个中断产生,相应的中断处理直接被自动进行.因为系统中断并不支持中断共
+享.总的来说,系统回应中断以如下2种方式:
++ 一个signal被告知给当前用户进程有错误发生.
++ kernel隐式的纠正错误.比如page fault的产生,系统自动纠正它.
+
+** Calling the High-level ISR
+如上所述flow处理最后都会调用 =handle_IRQ_event= 来调用上层相关ISRs.这
+个函数需要IRQ编号和action链为参数:
+#+begin_src c
+// kernel/irq/handle.c
+irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action);
+#+end_src
+
+=handle_IRQ_event= 进行如下行为:
++ 如果 =IRQF_DISABLED= 在第一个处理函数中没有被设置,中断使能
+  =local_irq_enable_in_hardirq= ,也就是处理函数能被其他IRQs中断.
++ 注册IRQ的 =action= 函数一个接一个被调用.
++ 如果IRQ的 =IRQF_SAMPLE_RANDOM= 被设置, =add_interrupt_randomness= 被
+  调用来使用事件的时间添加为随机数产生源(如果中断随即发生,它们是理想的
+  随机源).
++ 最后调用 =local_irq_disable= 关闭中断.因为打开和关闭中断不用匹配,所
+  以无论一开始它被打开或关闭. =handle_IRQ_event= 被调用时,中断被关闭,
+  离开时再次关闭它.
+
+对于共享的IRQs,kernel没有办法知道哪个设备触发的请求.整个留给处理函数使
+用设备相关的寄存器或其他硬件特性来找出中断源头.如果中断不是相关处理函
+数,立刻返回.所以 =handle_IRQ_event= 无从知道这个中断是否对它请求,所以
+kernel执行所有处理函数,无论第一个还是最后一个成功.
+
+无论如何,kernel能检查是否有对此IRQ负责的处理. =irqreturn_t= 被定义作为
+处理函数的返回值.它的值是 =IRQ_NONE= 或 =IRQ_HANDLED=. 在进行所有处理
+函数时,kernel对所有处理的返回做或运算,得出IRQ是否被处理的结果.
+* Software interrupts
+软中断能使kernel延后执行任务.因为它们的行为与如上描述的中断类似,但是完
+全在软件实现,所以它们被称为软中断或softIRQs.
+
+softIRQ的中心元素是一张维护 =softirq_action= 类型的表, 如下:
+#+begin_src c
+  // <softirq.c>
+  static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
+  // <interrupt.h>
+  struct softirq_action
+  {
+    void (*action)(struct softirq_action *);
+  };
+#+end_src
+
+=action= 是指向当软中断发生,kernel执行的处理函数.在 =softirq_action=
+中没有封装data指针,每个处理函数的数据由各自维护,并在多核系统中,为每个
+核定义此变量使得多个软中断同时在多个不同核运行,以 =HI_SOFTIRQ= 软中断为例:
+#+begin_src c
+// define
+static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec);
+// use
+list = __get_cpu_var(tasklet_hi_vec).head;
+#+end_src
+
+软中断在kernel执行它们前,必须注册, =open_softirq= 函数提供此目的,注册
+新的softIRQ到表 =softirq_vec= 指定位置:
+#+begin_src c
+// kernel/softirq.c
+void open_softirq(int nr, void (*action)(struct softirq_action *))
+{
+	softirq_vec[nr].action = action;
+}
+#+end_src
+
+事实上,每个softIRQ都有一个唯一的编号,也表示softIRQs是相对稀缺的资源.只
+有中心kernel代码使用软中断,如下:
+#+begin_src c
+// <interrupt.h>
+enum
+{
+	HI_SOFTIRQ=0,
+	TIMER_SOFTIRQ,
+	NET_TX_SOFTIRQ,
+	NET_RX_SOFTIRQ,
+	BLOCK_SOFTIRQ,
+	BLOCK_IOPOLL_SOFTIRQ,
+	TASKLET_SOFTIRQ,
+	SCHED_SOFTIRQ,
+	HRTIMER_SOFTIRQ,
+	RCU_SOFTIRQ,	/* Preferable RCU should always be the last softirq */
+	NR_SOFTIRQS
+};
+#+end_src
+
++ 两个被用来是实现tasklets的是 =HI_SOFTIRQ= 和 =TASKLET_SOFTIRQ= .
++ 在网络实现中,用来接收和发送操作的 =NET_RX_SOFTIRQ= 和
+  =NET_TX_SOFTIRQ= .
++ 块设备实现异步请求的 =BLOCK_SOFTIRQ= 和 =BLOCK_IOPOLL_SOFTIRQ= .
++ 调度器实现在SMP系统上周期性负载平衡的 =BLOCK_IOPOLL_SOFTIRQ= .
++ 高精度时钟的实现使用 =HRTIMER_SOFTIRQ=.
+
+对softIRQs编号产生次序优先,不影响每个处理函数的执行频率或相对其他活动
+的优先权,它定义同时多个处理函数被激活或等待,依次执行的顺序.
+
+=raise_softirq(int nr)= 被用来触发一个软中断,目的软中断编号作为传入参
+数.这个函数在每个CPU变量
+=irq_stat[smp_processor_id].__softirq_pending= 设置相应比特位.这标志
+softIRQ要执行并延后执行.使用处理器特定的bitmap,kernel能在不同CPU上同时
+运行softIRQ.
+
+** Starting SoftIRQ Processing
+有许多方法开始softIRQ的处理,但最后都调用 =do_softirq= 函数.如下图描述
+它的代码流程:
+
+[[./Files/do-softirq.jpeg]]
+
+首先函数确保它不在中断中(也就是一个硬件中断).如果在,立即终止.因为软中
+断是用来执行ISRs中不重要的部分,所以代码本身不能在一个中断处理中调用.
+
+由函数 =local_softirq_pending= 得到当前CPU中被设置的所有软中断.如果有
+软中断等待被处理,然后调用 =__do_softirq= .
+
+在关闭中断情况下(防止其他进程同时修改),重置当前的bitmap为0,也就是所有
+等待的软中断标志位被删除.之后打开中断,执行软中断处理函数.此间,允许
+bitmap在任何时候被修改.
+
+在 =softirq_vec= 中的处理函数在循环中为每个等待softIRQ调用.
+
+一旦所有标志的软中断被服务完,kernel检查是否有新的软中断同时被置位.如果
+有等待的软中断,并且重执行次数没有超过 =MAX_SOFTIRQ_RESTART= (基本是
+10),那么再次重新执行一遍.
+
+如果仍有等待的软中断在 =MAX_SOFTIRQ_RESTART= 次重新执行后,
+=wakeup_softirqd= 被调用来唤醒软中断后台程序.
+
+** The SoftIRQ Daemon
+软中断的后台程序任务是异步的执行软中断.每个处理器被分配它们各自的后台
+程序 =ksoftirqd=.
+
+=wakeup_softirqd= 在kernel的2处被调用来唤醒次后台程序:
++ 在 =do_softirq= 中.
++ 在 =raise_softirq_irqoff= 最后. 这个函数被 =raise_softirq= 内部调用.
+
+软中断的后台程序在系统启动时的 =init= 后通过 =initcall= 机制被调用.初
+始化完后,每个后台程序执行如下循环:
+#+begin_src c
+  // kernel/softirq.c
+  static int ksoftirqd(void * __bind_cpu)
+  // ...
+      while (!kthread_should_stop()) {
+        if (!local_softirq_pending()) {
+          schedule();
+        }
+        __set_current_state(TASK_RUNNING);
+        while (local_softirq_pending()) {
+          do_softirq();
+          cond_resched();
+        }
+        set_current_state(TASK_INTERRUPTIBLE);
+      }
+  // ...
+  }
+#+end_src
+
+每次它被唤醒,先检查是否有标志的软中断在等待,没有的话,调度给另外进程.
+
+如果有等待的软中断,后台程序去服务它们.在while循环中,两个函数
+=do_softirq= 和 =cond_resched= 被不断调用直到没有等待的软中断.
+=cond_resched= 确保调度器得到调用如果 =TIF_NEED_RESCHED= 设置到当前进
+程.
+* Tasklets
+软中断由内核在静态表中固定使用,延迟机制相对复杂.因为软中断能同时和独立
+的在多个处理器上运行.这也是效率的关键所在,网络实现性能在多核系统显著的
+得到提高.但是,处理函数必须设计完全可重入并且线程安全.
+
+Tasklets和work queues是另外延迟执行任务的机制,它们的实现基于softIRQs,
+但是她们更容易使用,因此更适合设备驱动.
+
+** Generating Tasklets
+中心数据结构是 =tasklet_struct= ,如下:
+#+begin_src c
+  // <interrupt.h>
+  struct tasklet_struct
+  {
+    struct tasklet_struct *next;
+    unsigned long state;
+    atomic_t count;
+    void (*func)(unsigned long);
+    unsigned long data;
+  };
+#+end_src
+
++ 从设备驱动程序来说,最重要的元素是 =func=.它指向需要延迟运行的函数.
+  =data= 是作为传递参数.
++ =next= 用来建立一个tasklet的链表.允许多个任务等待被执行.
++ =state= 表明当前task的状态.只有2种选项,并且表示不同的bit位,可以独立
+  设置和移除.
+  + =TASKLET_STATE_SCHED= 设置当tasklet被注册,并调度执行.
+  + =TASKLET_STATE_RUN= 表明tasklet正在执行.
++ =count= 被用来禁止已经调度过的tasklets.当它的值非0,相应的tasklet被忽
+  略.
+
+** Registering Tasklets
+=tasklet_schedule= 在系统中注册一个tasklet:
+#+begin_src c
+// <interrupt.h>
+static inline void tasklet_schedule(struct tasklet_struct *t);
+#+end_src
+
+如果 =TASKLET_STATE_SCHED= 被置位,注册终止因为这个tasklet已经被注册.否
+则,这个tasklet被放入CPU特定的链表 =tasklet_vec= 头部.
+
+** Executing Tasklets
+因为tasklet实现在softIRQ上,所以它们总是得到执行当软中断被处理时.
+Tasklets与软中断 =TASKLET_SOFTIRQ= 挂钩,所以调用
+=raise_softirq(TASKLET_SOFTIRQ)= 来执行当前处理器的tasklets在下次机会
+中.kernel使用 =tasklet_action= 作为tasklet软中断的执行函数.
+
+
+这个函数先获取要执行的CPU特定的list,把它从全局list中移除到本地.然后它
+们在如下循环中依次执行:
+#+begin_src c
+  // kernel/softirq.c
+  static void tasklet_action(struct softirq_action *a)
+  // ...
+      while (list) {
+        struct tasklet_struct *t = list;
+        list = list->next;
+        if (tasklet_trylock(t)) {
+          if (!atomic_read(&t->count)) {
+            if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+              BUG();
+            t->func(t->data);
+            tasklet_unlock(t);
+            continue;
+          }
+          tasklet_unlock(t);
+        }
+        // ...
+      }
+  // ...
+  }
+#+end_src
+
+在while循环中执行tasklets机制同处理softIRQs类似.
+
+因为一个tasklet只能同时在一个处理器上执行,但是其他tasklet能并行运
+行,tasklet特定的锁需要. =state= 的状态被使用来作为锁变量. 在tasklet的
+处理函数执行前,kernel使用 =tasklet_trylock= 来检查tasklet的状态是否是
+=TASKLET_STATE_RUN= ,也就是它是否已经在其他处理器上运行.
+
+#+begin_src c
+  // <interrupt.h>
+  static inline int tasklet_trylock(struct tasklet_struct *t)
+  {
+    return !test_and_set_bit(TASKLET_STATE_RUN, &(t)->state);
+  }
+#+end_src
+
+如果元素 =count= 非0, tasklet被认为未激活,代码不被执行.
+
+一旦两个检查都通过,kernel执行tasklet的处理函数通过调用
+=t->func(t->data)= .最终tasklet的 =TASKLET_SCHED_RUN= 位删除通过
+=tasklet_unlock=.
+
+如果在执行tasklets中,新的tasklets在当前处理器中等待,软中断
+=TASKLET_SOFTIRQ= 被触发来尽快执行新的tasklets.
+
+除了普通的tasklets. kernel使用第二中高优先级tasklet.它的实现与普通的
+tasklets基本一致,除了以下一些改变:
++ =HI_SOFTIRQ= 取代 =TASKLET_SOFTIRQ= 作为softIRQ. 它相应的处理函数是
+  =tasklet_hi_action= .
++ 注册的tasklets队列如CPU特定的变量 =tasklet_hi_vec= 中,通过使用
+  =tasklet_hi_schedule= .
+
+高优先级意味着 =HI_SOFTIRQ= 的软中断执行在所有其他处理之前--特别在网络
+处理之前.现在,大多声卡驱动使用此机制,因为延后太长会影响音效质量.
+
+** Example
+[[./Files/tasklet-examples.tar.gz][源码包下载]].
+#+begin_src c
+#include <linux/module.h>	
+#include <linux/kernel.h>	
+#include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/interrupt.h>
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("tasklet examples");
+
+void tasklet_func(unsigned long arg) {
+  printk(KERN_INFO "tasklet function %lu", arg);
+}
+DECLARE_TASKLET(task_test1, tasklet_func, 1);
+DECLARE_TASKLET_DISABLED(task_test2, tasklet_func, 2);
+
+static int __init tasklet_example_init(void) {
+  printk(KERN_INFO "the state of task1 is %ld and count is %d\n",
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO "the state of task2 is %ld and count is %d\n",
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO "enable task2\n");
+  tasklet_enable(&task_test2);
+  printk(KERN_INFO "after enable, the state of task2 is %ld and count is %d\n",
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO "schedule tasklets\n");
+  tasklet_schedule(&task_test1);
+  tasklet_schedule(&task_test2);
+  printk(KERN_INFO "the state of task1 is %ld and count is %d\n",
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO "the state of task2 is %ld and count is %d\n",
+         task_test2.state, task_test2.count);
+  return 0;
+}
+
+static void __exit tasklet_example_exit(void) {
+  printk(KERN_INFO "tasklet exit\n");
+}
+module_init(tasklet_example_init);
+module_exit(tasklet_example_exit);
+#+end_src
+
+#+begin_src sh
+obj-m += tasklet_example.o
+
+all:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+
+clean:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+#+end_src
+
+run:
+#+begin_src sh
+$ make
+$ sudo insmod ./tasklet_example.ko 
+$ dmesg | tail
+[758618.602354] the state of task1 is 0 and count is 0
+[758618.602356] the state of task2 is 0 and count is 1
+[758618.602357] enable task2
+[758618.602358] after enable, the state of task2 is 0 and count is 0
+[758618.602359] schedule tasklets
+[758618.602362] the state of task1 is 1 and count is 0
+[758618.602363] the state of task2 is 1 and count is 0
+[758618.602426] tasklet function 1
+[758618.602427] tasklet function 2
+#+end_src
+* Wait queues and completions
+Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待
+时进入睡眠,当时间发生时自动由kernel唤醒.Completion建立于wati queues之
+上,并被用来等待某个动作的结束.
+
+** Wait Queues
+*** Data Structures
+每个wait queue都有一个头部如下表示:
+#+begin_src c
+  // <wait.h>
+  struct __wait_queue_head {
+    spinlock_t lock;
+    struct list_head task_list;
+  };
+  typedef struct __wait_queue_head wait_queue_head_t;
+#+end_src
+
+因为wait queues能在中断中被修改,所以spinlock需要获取在修改它前.
+
+队列中的元素如下结构:
+#+begin_src c
+  // <wait.h>
+  struct __wait_queue {
+    unsigned int flags;
+    void *private;
+    wait_queue_func_t func;
+    struct list_head task_list;
+  };
+  typedef struct __wait_queue wait_queue_t;
+#+end_src
+
++ =flags= 有值 =WQ_FLAG_EXCLUSIVE= 或没有. 标识 =WQ_FLAG_EXCLUSIVE= 表
+  明等待进程互斥的被唤醒.
++ =private= 指向等待进程的task结构. 这个变量基本能指向任意似有数据,但
+  是kernel很少使用.
++ =func= 当唤醒时被调用.
++ =task_list= 是list元素,被用来把此元素放入等待队列.
+
+Wait queue分为两部分:
+1. 把当前进程放入wait queue而睡眠,通过调用 =wait_event= 函数.
+2. 在kernel的另外地方,调用 =wake_up= 函数唤醒等待的进程.
+*** Putting Processes to Sleep
+函数 =add_wait_queue= 被使用来把一个task加入到等待队列,这个函数在获取
+spinlock后把工作交给 =__add_wait_queue=:
+#+begin_src c
+  // <wait.h>
+  static inline void __add_wait_queue(wait_queue_head_t *head, wait_queue_t *new)
+  {
+    list_add(&new->task_list, &head->task_list);
+  }
+#+end_src
+
+使用list函数 =list_add= 把新task加入到等待队列中.
+
+=add_wait_queue_exclusive= 基本一样,只是同时设置 =WQ_EXCLUSIVE= 标识.
+
+另外方法是 =prepare_to_wait=, 并还需要task状态作为参数:
+#+begin_src c
+// kernel/wait.c
+void
+prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
+{
+	unsigned long flags;
+
+	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
+	spin_lock_irqsave(&q->lock, flags);
+	if (list_empty(&wait->task_list))
+		__add_wait_queue(q, wait);
+	set_current_state(state);
+	spin_unlock_irqrestore(&q->lock, flags);
+}
+#+end_src
+
+=prepare_to_wait_exclusive= 同样是设置 =WQ_FLAG_EXCLUSIVE= 标识的版本.
+
+有2个标准的方法来初始化等待队列节点:
+1. =init_waitqueue_entry= 动态初始化 =wait_queue_t= 实例:
+   #+begin_src c
+     // <wait.h>
+     static inline void init_waitqueue_entry(wait_queue_t *q, struct task_struct *p)
+     {
+             q->flags = 0;
+             q->private = p;
+             q->func = default_wake_function;
+     }
+   #+end_src
+2. =DEFINE_WAIT= 静态的初始化一个 =wait_queue_t= 实例:
+   #+begin_src c
+          // <wait.h>
+     #define DEFINE_WAIT(name) DEFINE_WAIT_FUNC(name, autoremove_wake_function)
+     #define DEFINE_WAIT_FUNC(name, function)                                \
+       wait_queue_t name = {                                                 \
+         .private        = current,                                          \
+         .func           = function,                                         \
+         .task_list      = LIST_HEAD_INIT((name).task_list),                 \
+       }
+   #+end_src
+
+=add_wait_queue= 一般不直接使用.通常使用 =wait_event=. 这个宏有两个参
+数:
+1. 等待的队列.
+2. 等待时间的表达式.
+
+宏确保等待情况没有被满足,若已满足,处理立刻停止,因此没有什么东西可以等
+待.wait的主要工作由 =__wait_event= 定义:
+#+begin_src c
+// <wait.h>
+#define wait_event(wq, condition) 					\
+do {									\
+	if (condition)	 						\
+		break;							\
+	__wait_event(wq, condition);					\
+} while (0)
+
+#define __wait_event(wq, condition) 					\
+do {									\
+	DEFINE_WAIT(__wait);						\
+									\
+	for (;;) {							\
+		prepare_to_wait(&wq, &__wait, TASK_UNINTERRUPTIBLE);	\
+		if (condition)						\
+			break;						\
+		schedule();						\
+	}								\
+	finish_wait(&wq, &__wait);					\
+} while (0)
+#+end_src
+
+在用 =DEFINE_WAIT= 设置好等待队列元素后,宏产生一个无尽的循环.使用
+=prepare_to_wai= 让此进程在此等待队列上睡眠.每次它唤醒,都检查特定的条
+件是否满足,若是则离开循环.否则,交给调度器,自己继续睡眠.
+
+当条件得到满足后, =finish_wait= 把task状态重新设置回 =TASK_RUNNING= 并
+把它从等待队列中移除.
+
+除了 =wait_event=, kernel定义其他一些宏来让当前进程等待:
+
+#+begin_src c
+// <wait.h>
+#define wait_event_interruptible(wq, condition)
+#define wait_event_timeout(wq, condition, timeout) { ... }
+#define wait_event_interruptible_timeout(wq, condition, timeout)
+#+end_src
+
++ =wait_event_interruptible= 设置当前进程 =TASK_INTERRUPTIBLE=.睡眠中
+  的进程能被接收的signal所唤醒.
++ =wait_event_timeout= 等待特定条件满足,但是在已jiffies为单位的超时后
+  停止等待.
++ =wait_event_interruptible_timeout= 既可被接收的signal所唤醒,并超时等
+  待.
+
+*** Waking Processes
+kernel定义了一系列宏来唤醒等待队列中的进程,它们都基于同一个函数:
+#+begin_src c
+// <wait.h>
+#define wake_up(x) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
+#define wake_up_nr(x, nr) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
+#define wake_up_all(x) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, NULL)
+#define wake_up_interruptible(x) __wake_up(x, TASK_INTERRUPTIBLE, 1, NULL)
+#define wake_up_interruptible_nr(x, nr) __wake_up(x, TASK_INTERRUPTIBLE, nr, NULL)
+#define wake_up_interruptible_all(x) __wake_up(x, TASK_INTERRUPTIBLE, 0, NULL)
+#+end_src
+在获取必要的等待队列头的锁后, =__wake_up= 把工作交给
+=__wake_up_common= :
+#+begin_src c
+  // kernel/sched.c
+  static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
+                               int nr_exclusive, int sync, void *key)
+  {
+    wait_queue_t *curr, *next;
+  
+    list_for_each_entry_safe(curr, next, &q->task_list, task_list) {
+      unsigned flags = curr->flags;
+  
+      if (curr->func(curr, mode, wake_flags, key) &&
+          (flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
+        break;
+    }
+  }
+#+end_src
+
+*** Example
+[[./Files/wait_queue_example.tar.gz][源码包下载]].
+#+begin_src c
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <asm/uaccess.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("wait queue example module");
+
+//wait_queue_head_t read_wait_queue;
+DECLARE_WAIT_QUEUE_HEAD(read_wait_queue);
+int read_flag = 0;
+static ssize_t buffer_read(struct file * file, char * buf, 
+			  size_t count, loff_t *ppos) {
+  char *str = "read finished\n";
+  ssize_t ret;
+  int len = strlen(str);
+  printk(KERN_INFO "prepare to read\n");
+  wait_event_interruptible(read_wait_queue, read_flag != 0);
+  printk(KERN_INFO "reader woken up\n");
+  read_flag = 0;
+  ret = copy_to_user(buf, str, len);
+  return ret;
+}
+
+ssize_t buffer_write(struct file *file, const char *buff,
+                     size_t count, loff_t *offp) {
+  ssize_t ret;
+  char str[100];
+  printk(KERN_INFO "writer to woke up reader\n");
+  read_flag = 1;
+  wake_up_interruptible(&read_wait_queue);
+  ret = copy_from_user(str, buff, 100);
+  return ret;
+}
+
+static const struct file_operations buffer_fops = {
+	.owner		= THIS_MODULE,
+	.read		= buffer_read,
+        .write          = buffer_write,
+};
+
+static struct miscdevice wait_test_dev = {
+	/*
+	 * kernel to just pick minor number.
+	 */
+	MISC_DYNAMIC_MINOR,
+	/*
+	 * Name ourselves /dev/hello.
+	 */
+	"wait_test",
+	&buffer_fops
+};
+
+static int __init wait_test_init(void) {
+	int ret;
+	ret = misc_register(&wait_test_dev);
+	if (ret)
+		printk(KERN_ERR
+		       "Unable to register wait test misc device\n");
+	return ret;
+}
+module_init(wait_test_init);
+
+static void __exit wait_test_exit(void) {
+	misc_deregister(&wait_test_dev);
+}
+module_exit(wait_test_exit);
+#+end_src
+** Completions
+Completions的实现基于如上的wait queues.Wait queue是等待某个条件得到满
+足,而Completion仅等待结构体中 =done= 得到满足.可以说是对wait queue等待
+某个完成的简易封装.使用如下数据结构:
+#+begin_src c
+  // <completion.h>
+  struct completion {
+    unsigned int done;
+    wait_queue_head_t wait;
+  };
+#+end_src
+
++ =done= 用来标示某个时间完成以让其他进程等待这个完成.
++ =wait= 是可以被放入睡眠的wait queue.
+
+=DECLARE_COMPLETION= 和 =init_completion= 分别静态和动态初始化
+=completion= 实例.
+
+进程被加入到list中使用 =wait_for_completion=, 它们在这list中等待直到它
+们的请求得到处理.如下:
+#+begin_src c
+  // <completion.h>
+  void wait_for_completion(struct completion *);
+  int wait_for_completion_interruptible(struct completion *x);
+  unsigned long wait_for_completion_timeout(struct completion *x,
+                                            unsigned long timeout);
+  unsigned long wait_for_completion_interruptible_timeout(
+      struct completion *x, unsigned long timeout);
+#+end_src
+
+一旦请求被kernel其他部分得到处理, =complete= 或 =complete_all= 必须被
+调用来唤醒等待的进程. =complete= 每次只移除一个进程从completion list中,所
+以想一次移除n个等待的进程,必须调用此函数n次.或者,一次唤醒和移除所有等
+待进程. =complete_and_exit= 是个微小的封装,先应用 =complete= 然后调用
+=do_exit= 来完成kernle线程.
+
+#+begin_src c
+  // <completion.h>
+  void complete(struct completion *);
+  void complete_all(struct completion *);
+  // kernel/exit.c
+  NORET_TYPE void complete_and_exit(struct completion *comp, long code);
+#+end_src
+
+每次 =complete= 被调用, =done= 被增加1, =wait_for= 函数只使调用者睡眠
+当 =done= 等于0时. =complete_all= 类似,但是设置 =done= 为可能的最大值(
+=UINT_MAX/2= ).
+
+** Work Queues
+Work queues延迟执行任务.相当于后台进程,它能随意睡眠才执行.
+
+对于每个work queue, kernel产生一个新的kernel后台进程,使用wait queue机
+制来延后执行任务.
+
+一个新的wait queue通过调用下面函数之一生成: =create_workqueue= 或
+=create_workqueue_singlethread= .第一个函数在所有CPU上创建一个worker
+thread. 后一个在第一个CPU上创建一个thread.两者内部都使用
+=__create_workqueue_key= :
+
+#+begin_src c
+// kernel/workqueue.c
+#define __create_workqueue(name, singlethread, freezeable, rt)	\
+	__create_workqueue_key((name), (singlethread), (freezeable), (rt), \
+			       NULL, NULL)
+#+end_src
+
+=name= 是产生的后台进程在进程列表中显示的名字.如果 =singlethread= 设置
+为0, 在每个CPU中都创建一个线程,否则就只在第一个.
+
+被放入wait queue中的任务必须封装成 =work_struct= 结构:
+#+begin_src c
+  // <workqueue.h>
+  struct work_struct;
+  typedef void (*work_func_t)(struct work_struct *work);
+  struct work_struct {
+    atomic_long_t data;
+    struct list_head entry;
+    work_func_t func;
+  }
+#+end_src
+
+=func= 指向要延迟执行的函数.这个并把指向本身 =work_struct= 的指针作为
+参数,这样允许函数从中获取到 =data= 元素.
+
+为什么kernel使用 =atomic_long_t= 作为数据指针的类型,而不是 =void*= 呢?
+实际上,之前的kernel版本定义 =work_struct= 如下:
+#+begin_src c
+  // <workqueue.h>
+  struct work_struct {
+    ...
+    void (*func)(void *);
+    void *data;
+    ...
+  };
+#+end_src
+
+=data= 如希望一样是指针类型.但是kernel使用了小技巧,存储更多信息到结构
+中而不用花费更多内存.因为指针以4字节对齐在所有架构上,首2个比特位保证是
+0.因此使用它们来包含更多的标识位,余下的比特位继续包含指针信息.如下的宏
+用来提取标识位:
+#+begin_src c
+// <workqueue.h>
+#define WORK_STRUCT_FLAG_MASK (3UL)
+#define WORK_STRUCT_WQ_DATA_MASK (~WORK_STRUCT_FLAG_MASK)
+#+end_src
+
+现在只有一个标识被定义: =WORK_STRUCT_PENDING= 允许检查一个可延迟的work
+当前是否被挂起还是没有.辅助宏 =work_pending(work)= 用来检查这个位. 原
+子类型确保修改而不用担心并行问题.
+
+kernel提供宏 =INIT_WORK(work, func)= 来初始化这个结构,如果参数需要,必
+须在之后再设置.
+
+此 =work_struct= 在未定义的时间后运行(当调度器选择这个后台进程运行).
+
+为了确保work queue 在 *之后* 特定时间才执行, =work_struct= 需要一个
+timer.解决方法如下:
+#+begin_src c
+  // <workqueue.h>
+  struct delayed_work {
+    struct work_struct work;
+    struct timer_list timer;
+  };
+#+end_src
+
+把两者加入work queue的放入如下:
+#+begin_src c
+  // kernel/workqueue.c
+  int fastcall queue_work(struct workqueue_struct *wq, struct work_struct *work)
+  int fastcall queue_delayed_work(struct workqueue_struct *wq,
+                                  struct delayed_work *dwork, unsigned long delay)
+#+end_src
+
+=queue_delayed_work= 先产生一个超时是 =delayed= jiffies的kernel timer,
+相应的处理函数是使用 =queue_work= 把work加入到work queue中.
+
+kernel产生一个标准的叫 =keventd_wq= 的wait queue.这个queue可以被所有
+kernel中不值得创建一个独立work queue的部分使用. 并有如下两个函数实现把
+新的work加入这个标准queue中:
+#+begin_src c
+static struct workqueue_struct *keventd_wq __read_mostly;
+// kernel/workqueue.c
+int schedule_work(struct work_struct *work)
+int schedule_delayed_work(struct delay_work *dwork, unsigned long delay)
+#+end_src
+
+* reference
+** =struct irq_desc=
+#+begin_src c
+/**
+ * struct irq_desc - interrupt descriptor
+ * @irq:		interrupt number for this descriptor
+ * @timer_rand_state:	pointer to timer rand state struct
+ * @kstat_irqs:		irq stats per cpu
+ * @irq_2_iommu:	iommu with this irq
+ * @handle_irq:		highlevel irq-events handler [if NULL, __do_IRQ()]
+ * @chip:		low level interrupt hardware access
+ * @msi_desc:		MSI descriptor
+ * @handler_data:	per-IRQ data for the irq_chip methods
+ * @chip_data:		platform-specific per-chip private data for the chip
+ *			methods, to allow shared chip implementations
+ * @action:		the irq action chain
+ * @status:		status information
+ * @depth:		disable-depth, for nested irq_disable() calls
+ * @wake_depth:		enable depth, for multiple set_irq_wake() callers
+ * @irq_count:		stats field to detect stalled irqs
+ * @last_unhandled:	aging timer for unhandled count
+ * @irqs_unhandled:	stats field for spurious unhandled interrupts
+ * @lock:		locking for SMP
+ * @affinity:		IRQ affinity on SMP
+ * @node:		node index useful for balancing
+ * @pending_mask:	pending rebalanced interrupts
+ * @threads_active:	number of irqaction threads currently running
+ * @wait_for_threads:	wait queue for sync_irq to wait for threaded handlers
+ * @dir:		/proc/irq/ procfs entry
+ * @name:		flow handler name for /proc/interrupts output
+ */
+struct irq_desc {
+	unsigned int		irq;
+	struct timer_rand_state *timer_rand_state;
+	unsigned int            *kstat_irqs;
+#ifdef CONFIG_INTR_REMAP
+	struct irq_2_iommu      *irq_2_iommu;
+#endif
+	irq_flow_handler_t	handle_irq;
+	struct irq_chip		*chip;
+	struct msi_desc		*msi_desc;
+	void			*handler_data;
+	void			*chip_data;
+	struct irqaction	*action;	/* IRQ action list */
+	unsigned int		status;		/* IRQ status */
+
+	unsigned int		depth;		/* nested irq disables */
+	unsigned int		wake_depth;	/* nested wake enables */
+	unsigned int		irq_count;	/* For detecting broken IRQs */
+	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
+	unsigned int		irqs_unhandled;
+	spinlock_t		lock;
+#ifdef CONFIG_SMP
+	cpumask_var_t		affinity;
+	unsigned int		node;
+#ifdef CONFIG_GENERIC_PENDING_IRQ
+	cpumask_var_t		pending_mask;
+#endif
+#endif
+	atomic_t		threads_active;
+	wait_queue_head_t       wait_for_threads;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry	*dir;
+#endif
+	const char		*name;
+} ____cacheline_internodealigned_in_s
+#+end_src
+** =set_irq_chip=
+#+begin_src c
+/**
+ *	set_irq_chip - set the irq chip for an irq
+ *	@irq:	irq number
+ *	@chip:	pointer to irq chip description structure
+ */
+int set_irq_chip(unsigned int irq, struct irq_chip *chip)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	unsigned long flags;
+
+	if (!desc) {
+		WARN(1, KERN_ERR "Trying to install chip for IRQ%d\n", irq);
+		return -EINVAL;
+	}
+
+	if (!chip)
+		chip = &no_irq_chip;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	irq_chip_set_defaults(chip);
+	desc->chip = chip;
+	spin_unlock_irqrestore(&desc->lock, flags);
+
+	return 0;
+}
+#+end_src
+** =handle_edge_irq=
+#+begin_src c
+void
+handle_edge_irq(unsigned int irq, struct irq_desc *desc)
+{
+	spin_lock(&desc->lock);
+
+	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+
+	/*
+	 * If we're currently running this IRQ, or its disabled,
+	 * we shouldn't process the IRQ. Mark it pending, handle
+	 * the necessary masking and go out
+	 */
+	if (unlikely((desc->status & (IRQ_INPROGRESS | IRQ_DISABLED)) ||
+		    !desc->action)) {
+		desc->status |= (IRQ_PENDING | IRQ_MASKED);
+		mask_ack_irq(desc, irq);
+		goto out_unlock;
+	}
+	kstat_incr_irqs_this_cpu(irq, desc);
+
+	/* Start handling the irq */
+	if (desc->chip->ack)
+		desc->chip->ack(irq);
+
+	/* Mark the IRQ currently in progress.*/
+	desc->status |= IRQ_INPROGRESS;
+
+	do {
+		struct irqaction *action = desc->action;
+		irqreturn_t action_ret;
+
+		if (unlikely(!action)) {
+			desc->chip->mask(irq);
+			goto out_unlock;
+		}
+
+		/*
+		 * When another irq arrived while we were handling
+		 * one, we could have masked the irq.
+		 * Renable it, if it was not disabled in meantime.
+		 */
+		if (unlikely((desc->status &
+			       (IRQ_PENDING | IRQ_MASKED | IRQ_DISABLED)) ==
+			      (IRQ_PENDING | IRQ_MASKED))) {
+			desc->chip->unmask(irq);
+			desc->status &= ~IRQ_MASKED;
+		}
+
+		desc->status &= ~IRQ_PENDING;
+		spin_unlock(&desc->lock);
+		action_ret = handle_IRQ_event(irq, action);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+		spin_lock(&desc->lock);
+
+	} while ((desc->status & (IRQ_PENDING | IRQ_DISABLED)) == IRQ_PENDING);
+
+	desc->status &= ~IRQ_INPROGRESS;
+out_unlock:
+	spin_unlock(&desc->lock);
+}
+#+end_src
+** =handle_level_irq=
+#+begin_src c
+void
+handle_level_irq(unsigned int irq, struct irq_desc *desc)
+{
+	struct irqaction *action;
+	irqreturn_t action_ret;
+
+	spin_lock(&desc->lock);
+	mask_ack_irq(desc, irq);
+
+	if (unlikely(desc->status & IRQ_INPROGRESS))
+		goto out_unlock;
+	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+	kstat_incr_irqs_this_cpu(irq, desc);
+
+	/*
+	 * If its disabled or no action available
+	 * keep it masked and get out of here
+	 */
+	action = desc->action;
+	if (unlikely(!action || (desc->status & IRQ_DISABLED)))
+		goto out_unlock;
+
+	desc->status |= IRQ_INPROGRESS;
+	spin_unlock(&desc->lock);
+
+	action_ret = handle_IRQ_event(irq, action);
+	if (!noirqdebug)
+		note_interrupt(irq, desc, action_ret);
+
+	spin_lock(&desc->lock);
+	desc->status &= ~IRQ_INPROGRESS;
+
+	if (unlikely(desc->status & IRQ_ONESHOT))
+		desc->status |= IRQ_MASKED;
+	else if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
+		desc->chip->unmask(irq);
+out_unlock:
+	spin_unlock(&desc->lock);
+}
+#+end_src
+** =handle_IRQ_event=
+#+begin_src c
+irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
+{
+	irqreturn_t ret, retval = IRQ_NONE;
+	unsigned int status = 0;
+
+	if (!(action->flags & IRQF_DISABLED))
+		local_irq_enable_in_hardirq();
+
+	do {
+		trace_irq_handler_entry(irq, action);
+		ret = action->handler(irq, action->dev_id);
+		trace_irq_handler_exit(irq, action, ret);
+
+		switch (ret) {
+		case IRQ_WAKE_THREAD:
+			/*
+			 * Set result to handled so the spurious check
+			 * does not trigger.
+			 */
+			ret = IRQ_HANDLED;
+			/*
+			 * Catch drivers which return WAKE_THREAD but
+			 * did not set up a thread function
+			 */
+			if (unlikely(!action->thread_fn)) {
+				warn_no_thread(irq, action);
+				break;
+			}
+			/*
+			 * Wake up the handler thread for this
+			 * action. In case the thread crashed and was
+			 * killed we just pretend that we handled the
+			 * interrupt. The hardirq handler above has
+			 * disabled the device interrupt, so no irq
+			 * storm is lurking.
+			 */
+			if (likely(!test_bit(IRQTF_DIED,
+					     &action->thread_flags))) {
+				set_bit(IRQTF_RUNTHREAD, &action->thread_flags);
+				wake_up_process(action->thread);
+			}
+			/* Fall through to add to randomness */
+		case IRQ_HANDLED:
+			status |= action->flags;
+			break;
+
+		default:
+			break;
+		}
+
+		retval |= ret;
+		action = action->next;
+	} while (action);
+
+	if (status & IRQF_SAMPLE_RANDOM)
+		add_interrupt_randomness(irq);
+	local_irq_disable();
+
+	return retval;
+}
+#+end_src
+** =__do_softirq=
+#+begin_src c
+#define MAX_SOFTIRQ_RESTART 10
+
+asmlinkage void __do_softirq(void)
+{
+	struct softirq_action *h;
+	__u32 pending;
+	int max_restart = MAX_SOFTIRQ_RESTART;
+	int cpu;
+
+	pending = local_softirq_pending();
+	account_system_vtime(current);
+
+	__local_bh_disable((unsigned long)__builtin_return_address(0));
+	lockdep_softirq_enter();
+
+	cpu = smp_processor_id();
+restart:
+	/* Reset the pending bitmask before enabling irqs */
+	set_softirq_pending(0);
+
+	local_irq_enable();
+
+	h = softirq_vec;
+
+	do {
+		if (pending & 1) {
+			int prev_count = preempt_count();
+			kstat_incr_softirqs_this_cpu(h - softirq_vec);
+
+			trace_softirq_entry(h, softirq_vec);
+			h->action(h);
+			trace_softirq_exit(h, softirq_vec);
+			if (unlikely(prev_count != preempt_count())) {
+				printk(KERN_ERR "huh, entered softirq %td %s %p"
+				       "with preempt_count %08x,"
+				       " exited with %08x?\n", h - softirq_vec,
+				       softirq_to_name[h - softirq_vec],
+				       h->action, prev_count, preempt_count());
+				preempt_count() = prev_count;
+			}
+
+			rcu_bh_qs(cpu);
+		}
+		h++;
+		pending >>= 1;
+	} while (pending);
+
+	local_irq_disable();
+
+	pending = local_softirq_pending();
+	if (pending && --max_restart)
+		goto restart;
+
+	if (pending)
+		wakeup_softirqd();
+
+	lockdep_softirq_exit();
+
+	account_system_vtime(current);
+	_local_bh_enable();
+}
+#+end_src
+** =ksoftirqd=
+#+begin_src c
+static int ksoftirqd(void * __bind_cpu)
+{
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	while (!kthread_should_stop()) {
+		preempt_disable();
+		if (!local_softirq_pending()) {
+			preempt_enable_no_resched();
+			schedule();
+			preempt_disable();
+		}
+
+		__set_current_state(TASK_RUNNING);
+
+		while (local_softirq_pending()) {
+			/* Preempt disable stops cpu going offline.
+			   If already offline, we'll be on wrong CPU:
+			   don't process */
+			if (cpu_is_offline((long)__bind_cpu))
+				goto wait_to_die;
+			do_softirq();
+			preempt_enable_no_resched();
+			cond_resched();
+			preempt_disable();
+			rcu_sched_qs((long)__bind_cpu);
+		}
+		preempt_enable();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
+	return 0;
+
+wait_to_die:
+	preempt_enable();
+	/* Wait for kthread_stop */
+	set_current_state(TASK_INTERRUPTIBLE);
+	while (!kthread_should_stop()) {
+		schedule();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
+	return 0;
+}
+#+end_src
