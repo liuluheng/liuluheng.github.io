@@ -1,31 +1,555 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: Linux Netfilter
+#+TITLE: Linux Netfilter and Traffic Control
 #+OPTIONS: num:nil H:2
 
-* reference
-http://en.wikipedia.org/wiki/Netfilter
+* Netfilter and iptables homepage
++ netfilter: http://www.netfilter.org/index.html
++ iptables: http://www.netfilter.org/projects/iptables/index.html
+* Overview
+[[http://en.wikipedia.org/wiki/Netfilter][Netfilter]] is a framework inside the Linux kernel which offers
+flexibility for various networking-related operations to be
+implemented in form of customized handlers. Netfilter offers various
+options for packet filtering, network address translation, and port
+translation.
 
-http://docs.openstack.org/havana/config-reference/content/under_the_hood_openvswitch.html
+Its components:
 
-http://erlerobotics.gitbooks.io/erle-robotics-introduction-to-networking-in-linux/security/introduction_to_iptables.html
+[[./Files/Netfilter-components.svg]]
 
-http://ebtables.sourceforge.net/br_fw_ia/br_fw_ia.html
+And the flow of network packets through the Netfilter:
 
-http://ebtables.sourceforge.net/br_fw_ia/PacketFlow.png
+[[./Files/Netfilter-packet-flow.svg]]
 
+* Netfilter Hooks in the Linux Kernel
+** Netfilter places
+从上网络包发送接受流程图中看出,可以在不同的地方注册Nefilter的hook函数.由
+如下定义:
 
-[[./files/PacketFlow.png]]
+#+begin_src c
+enum nf_inet_hooks {
+	NF_INET_PRE_ROUTING,
+	NF_INET_LOCAL_IN,
+	NF_INET_FORWARD,
+	NF_INET_LOCAL_OUT,
+	NF_INET_POST_ROUTING,
+	NF_INET_NUMHOOKS
+};
+#+end_src
++ =NF_INET_PRE_ROUTING=: incoming packets pass this hook in the
+  =ip_rcv()= (=linux/net/ipv4/ip_input.c=) function before they are
+  processed by the routing code.
++ =NF_INET_LOCAL_IN=: all incoming packets addressed to the local
+  computer pass this hook in the function =ip_local_deliver()=.
++ =NF_INET_FORWARD=: incoming packets are passed this hook in the
+  function =ip_forwared()=.
++ =NF_INET_LOCAL_OUT=: all outgoing packets created in the local
+  computer pass this hook in the function =ip_build_and_send_pkt()=.
++ =NF_INET_POST_ROUTING=: this hook in the ip_finish_output() function
+  before they leave the computer.
 
-* cc
-#+begin_src python
-
+** Register the hooks
+kernel 提供如下函数来注册和解除hook函数.
+#+begin_src c
+int nf_register_hook(struct nf_hook_ops *reg);
+void nf_unregister_hook(struct nf_hook_ops *reg);
+int nf_register_hooks(struct nf_hook_ops *reg, unsigned int n);
+void nf_unregister_hooks(struct nf_hook_ops *reg, unsigned int n);
 #+end_src
 
-#+begin_src c++
+其中 =nf_hook_ops= 结构如下:
+#+begin_src c
+struct nf_hook_ops
+{
+	struct list_head list;
 
+	/* User fills in from here down. */
+	nf_hookfn *hook;
+	struct module *owner;
+	u_int8_t pf;
+	unsigned int hooknum;
+	/* Hooks are ordered in ascending priority. */
+	int priority;
+};
 #+end_src
 
+** hook functions
+其中hook函数由 =nf_hookfn *hook= 指定,其函数声明如下:
+#+begin_src c
+typedef unsigned int nf_hookfn(unsigned int hooknum,
+			       struct sk_buff *skb,
+			       const struct net_device *in,
+			       const struct net_device *out,
+			       int (*okfn)(struct sk_buff *));
+#+end_src
+
+它返回如下结果之一:
+
+#+begin_src c
+// <linux/netfilter.h>
+#define NF_DROP 0
+#define NF_ACCEPT 1
+#define NF_STOLEN 2
+#define NF_QUEUE 3
+#define NF_REPEAT 4
+#define NF_STOP 5
+#define NF_MAX_VERDICT NF_STOP
+#+end_src
+
+** =pf=
+=pf= (protocol family) is the identifier of the protocol family.
+
+#+begin_src c
+enum {
+	NFPROTO_UNSPEC =  0,
+	NFPROTO_IPV4   =  2,
+	NFPROTO_ARP    =  3,
+	NFPROTO_BRIDGE =  7,
+	NFPROTO_IPV6   = 10,
+	NFPROTO_DECNET = 12,
+	NFPROTO_NUMPROTO,
+};
+#+end_src
+** =hooknum=
+This is the hook identifier. All valid identifiers for each
+protocol family are defined in a header file.
+
+for example =<linux/netfilter_ipv4.h>=:
+
+#+begin_src c
+/* IP Hooks */
+/* After promisc drops, checksum checks. */
+#define NF_IP_PRE_ROUTING	0
+/* If the packet is destined for this box. */
+#define NF_IP_LOCAL_IN		1
+/* If the packet is destined for another interface. */
+#define NF_IP_FORWARD		2
+/* Packets coming from a local process. */
+#define NF_IP_LOCAL_OUT		3
+/* Packets about to hit the wire. */
+#define NF_IP_POST_ROUTING	4
+#define NF_IP_NUMHOOKS		5
+#+end_src
+** =priority=
+This is the priority of the hook. All valid identifiers for each
+protocol family are defined in a header file.
+
+for example =<linux/netfilter_ipv4.h>=:
+#+begin_src c
+enum nf_ip_hook_priorities {
+	NF_IP_PRI_FIRST = INT_MIN,
+	NF_IP_PRI_CONNTRACK_DEFRAG = -400,
+	NF_IP_PRI_RAW = -300,
+	NF_IP_PRI_SELINUX_FIRST = -225,
+	NF_IP_PRI_CONNTRACK = -200,
+	NF_IP_PRI_MANGLE = -150,
+	NF_IP_PRI_NAT_DST = -100,
+	NF_IP_PRI_FILTER = 0,
+	NF_IP_PRI_SECURITY = 50,
+	NF_IP_PRI_NAT_SRC = 100,
+	NF_IP_PRI_SELINUX_LAST = 225,
+	NF_IP_PRI_CONNTRACK_CONFIRM = INT_MAX,
+	NF_IP_PRI_LAST = INT_MAX,
+};
+#+end_src
+
+
+
+#+begin_src c
+enum {
+	NFPROTO_UNSPEC =  0,
+	NFPROTO_IPV4   =  2,
+	NFPROTO_ARP    =  3,
+	NFPROTO_BRIDGE =  7,
+	NFPROTO_IPV6   = 10,
+	NFPROTO_DECNET = 12,
+	NFPROTO_NUMPROTO,
+};
+#+end_src
+* Netfilter hooks example
+在 =NF_INET_LOCAL_IN= 处注册一个hook函数,打印包的m源和目的MAC地址和IP
+地址. [[./Files/nf_test_module.zip][源码包下载]].
+
+#+begin_src c
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/types.h>
+#include <linux/skbuff.h>
+#include <linux/ip.h>
+#include <linux/udp.h>
+#include <linux/tcp.h>
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
+
+
+MODULE_LICENSE("GPLv3");
+MODULE_AUTHOR("SHI");
+MODULE_DESCRIPTION("Netfliter test");
+
+static unsigned int
+nf_test_in_hook(unsigned int hook, struct sk_buff *skb, const struct net_device *in,
+                const struct net_device *out, int (*okfn)(struct sk_buff*));
+
+static struct nf_hook_ops nf_test_ops[] __read_mostly = {
+  {
+    .hook = nf_test_in_hook,
+    .owner = THIS_MODULE,
+    .pf = NFPROTO_IPV4,
+    .hooknum = NF_INET_LOCAL_IN,
+    .priority = NF_IP_PRI_FIRST,
+  },
+};
+    
+void hdr_dump(struct ethhdr *ehdr) {
+    printk("[MAC_DES:%x,%x,%x,%x,%x,%x" 
+           "MAC_SRC: %x,%x,%x,%x,%x,%x Prot:%x]\n",
+           ehdr->h_dest[0],ehdr->h_dest[1],ehdr->h_dest[2],ehdr->h_dest[3],
+           ehdr->h_dest[4],ehdr->h_dest[5],ehdr->h_source[0],ehdr->h_source[1],
+           ehdr->h_source[2],ehdr->h_source[3],ehdr->h_source[4],
+           ehdr->h_source[5],ehdr->h_proto);
+}
+
+#define NIPQUAD(addr) \
+	((unsigned char *)&addr)[0], \
+	((unsigned char *)&addr)[1], \
+	((unsigned char *)&addr)[2], \
+	((unsigned char *)&addr)[3]
+#define NIPQUAD_FMT "%u.%u.%u.%u"
+
+static unsigned int
+nf_test_in_hook(unsigned int hook, struct sk_buff *skb, const struct net_device *in,
+                const struct net_device *out, int (*okfn)(struct sk_buff*)) {
+  struct ethhdr *eth_header;
+  struct iphdr *ip_header;
+  eth_header = (struct ethhdr *)(skb_mac_header(skb));
+  ip_header = (struct iphdr *)(skb_network_header(skb));
+  hdr_dump(eth_header);
+  printk("src IP:'"NIPQUAD_FMT"', dst IP:'"NIPQUAD_FMT"' \n",
+         NIPQUAD(ip_header->saddr), NIPQUAD(ip_header->daddr));
+  return NF_ACCEPT;
+}
+
+static int __init init_nf_test(void) {
+  int ret;
+  ret = nf_register_hooks(nf_test_ops, ARRAY_SIZE(nf_test_ops));
+  if (ret < 0) {
+    printk("register nf hook fail\n");
+    return ret;
+  }
+  printk(KERN_NOTICE "register nf test hook\n");
+  return 0;
+}
+
+static void __exit exit_nf_test(void) {
+  nf_unregister_hooks(nf_test_ops, ARRAY_SIZE(nf_test_ops));
+}
+
+module_init(init_nf_test);
+module_exit(exit_nf_test);
+#+end_src
+
+=dmesg | tail= 后的结果:
+#+begin_src sh
+[452013.507230] [MAC_DES:70,f3,95,e,42,faMAC_SRC: 0,f,fe,f6,7c,13 Prot:8]
+[452013.507237] src IP:'10.6.124.55', dst IP:'10.6.124.54' 
+[452013.944960] [MAC_DES:70,f3,95,e,42,faMAC_SRC: 0,f,fe,f6,7c,13 Prot:8]
+[452013.944968] src IP:'10.6.124.55', dst IP:'10.6.124.54' 
+[452014.960934] [MAC_DES:70,f3,95,e,42,faMAC_SRC: 0,f,fe,f6,7c,13 Prot:8]
+[452014.960941] src IP:'10.6.124.55', dst IP:'10.6.124.54' 
+[452015.476335] [MAC_DES:70,f3,95,e,42,faMAC_SRC: 0,f,fe,f6,7c,13 Prot:8]
+[452015.476342] src IP:'10.6.124.55', dst IP:'10.6.124.54' 
+[452016.023311] [MAC_DES:70,f3,95,e,42,faMAC_SRC: 0,f,fe,f6,7c,13 Prot:8]
+[452016.023318] src IP:'10.6.124.55', dst IP:'10.6.124.54' 
+#+end_src
+* Traffic Control HOWTO
+大多利用Netfilter来实现流的控制. 比较详细的文档是 [[http://www.lartc.org/lartc.html#LARTC.QDISC.TERMINOLOGY][Linux Advanced
+Routing & Traffic Control HOWTO]] 和缩简版的 [[http://www.tldp.org/HOWTO/html_single/Traffic-Control-HOWTO/][Traffic Control HOWTO]].
+
+这里针对流控制稍作分析和总结.
+** Terminology
++ Queueing Discipline (qdisc): An algorithm that manages the queue of
+  a device, either incoming (ingress) or outgoing (egress).
++ root qdisc: The root qdisc is the qdisc attached to the device.
++ Classless qdisc: A qdisc with no configurable internal subdivisions.
++ Classful qdisc: A classful qdisc contains multiple classes
++ Classes: A classful qdisc may have many classes, each of which is
+  internal to the qdisc.
++ Classifier: Each classful qdisc needs to determine to which class it
+  needs to send a packet.
++ Filter: Classification can be performed using filters.
++ Scheduling: A qdisc may, with the help of a classifier, decide that
+  some packets need to go out earlier than others.
++ Shaping: The process of delaying packets before they go out to make
+  traffic confirm to a configured maximum rate.
++ Policing: Delaying or dropping packets in order to make traffic stay
+  below a configured bandwidth.
+** tc bandwidth rules
+tc uses the following rules for bandwith specification:
+
+#+begin_src text
+mbps = 1024 kbps = 1024 * 1024 bps => byte/s
+mbit = 1024 kbit => kilo bit/s.
+mb = 1024 kb = 1024 * 1024 b => byte
+mbit = 1024 kbit => kilo bit.
+#+end_src
+** Simple, classless Queueing Disciplines
+*** =pfifo_fast=
+这个队列的特点就象它的名字——先进先出(FIFO),也就是说没有任何数据包被特
+殊对待。[[http://www.lartc.org/lartc.html#AEN658][它的参数与使用]]
+*** Token Bucket Filter
+令牌桶过滤器(TBF)是一个简单的队列规定:只允许以不超过事先设定的速率到来
+的数据包通过,但可能允许短暂突发流量朝过设定值。
+
+TBF 很精确,对于网络和处理器的影响都很小。所以如果您想对一个网卡限速,
+它应该成为您的第一选择!
+
+TBF 的实现在于一个缓冲器(桶),不断地被一些叫做“令牌”的虚拟数据以特定
+速率(token rate)填充着。桶最重要的参数就是它的大小,也就是它能够存储
+令牌的数量。[[http://www.lartc.org/lartc.html#AEN690][它的参数与使用]].
+*** Stochastic Fairness Queueing
+SFQ(Stochastic Fairness Queueing,随机公平队列)是公平队列算法家族中的一个
+简单实现。它的精确性不如其它的方法,但是它在实现高度公平的同时,需要的
+计算量却很少。
+
+SFQ 的关键词是“会话”(或称作“流”) ,主要针对一个 TCP 会话或者 UDP
+流。流量被分成相当多数量的 FIFO 队列中,每个队列对应一个会话。数据按照
+简单轮转的方式发送, 每个会话都按顺序得到发送机会。
+
+这种方式非常公平,保证了每一个会话都不会没其它会话所淹没。SFQ 之所以被
+称为“随机”,是因为它并不是真的为每一个会话创建一个队列,而是使用一个散
+列算法,把所有的会话映射到有限的几个队列中去。
+
+[[http://www.lartc.org/lartc.html#LARTC.SFQ][它的参数与使用]].
+** Classful Queueing Disciplines
+*** How filters are used to classify traffic
+#+begin_src text
+                     1:   root qdisc
+                      |
+                     1:1    child class
+                   /  |  \
+                  /   |   \
+                 /    |    \
+                 /    |    \
+              1:10  1:11  1:12   child classes
+               |      |     | 
+               |     11:    |    leaf class
+               |            | 
+               10:         12:   qdisc
+              /   \       /   \
+           10:1  10:2   12:1  12:2   leaf classes
+#+end_src
+*** Sample configuration
+创建这个树:
+
+#+begin_src text
+          1:   root qdisc
+         / | \ 
+       /   |   \
+       /   |   \
+     1:1  1:2  1:3    classes
+      |    |    |
+     10:  20:  30:    qdiscs    qdiscs
+     sfq  tbf  sfq
+band  0    1    2
+#+end_src
 
 #+begin_src sh
-
+# tc qdisc add dev eth0 root handle 1: prio
+## 这个命令立即创建了类: 1:1, 1:2, 1:3
+# tc qdisc add dev eth0 parent 1:1 handle 10: sfq
+# tc qdisc add dev eth0 parent 1:2 handle 20: tbf rate 20kbit buffer 1600 limit 3000
+# tc qdisc add dev eth0 parent 1:3 handle 30: sfq
 #+end_src
+** The Intermediate queueing device (IMQ)
+中介队列设备不是一个队列规定,但它的使用与队列规定是紧密相连的。 Linux就
+而言,队列规定是附带在网卡上的,所有在这个网卡上排队的数据都排进这个队
+列规定。根据这个概念,出现了两个局限:
+
+1. 只能进行出口整形(虽然也存在入口队列规定,但在上面实现分类的队列规定
+   的可能性非常小)。
+2. 一个队列规定只能处理一块网卡的流量,无法设置全局的限速。
+
+IMQ 就是用来解决上述两个局限的。简单地说,你可以往一个队列规定中放任
+何东西。被打了特定标记的数据包在 netfilter 的 =NF_IP_PRE_ROUTING= 和
+=NF_IP_POST_ROUTING= 两个钩子函数处被拦截,并被送到一个队列规定中,该
+队列规定附加到一个 IMQ 设备上。对数据包打标记要用到 iptables 的一种处理方法。
+这样你就可以对刚刚进入网卡的数据包打上标记进行入口整形,
+或者把网卡们当成一个个的类来看待而进行全局整形设置。
+*** imq device
+#+begin_src sh
+/net/imq.ko
+#+end_src
+
+*** netfilter support IMQ
+#+begin_src sh
+net/ipv4/netfilter/ipt_IMQ.ko
+net/ipv6/netfilter/ip6t_IMQ.ko
+#+end_src
+
+*** iptables support IMQ
+#+begin_src sh
+  iptables/libip6t_IMQ.so
+  iptables/libipt_IMQ.so
+#+end_src
+
+*** Sample configuration
+#+begin_src sh
+# modprobe imq numdevs=2
+# modprobe ipt_IMQ
+# ifconfig imq0 up
+# ifconfig imq1 up
+#+end_src
+
+#+begin_src sh
+#!/bin/bash
+modprobe imq numdevs=2
+modprobe ipt_IMQ
+ifconfig imq0 up
+ifconfig imq1 up
+
+tc qdisc del dev imq0 root 2>/dev/null 1>&2
+tc qdisc del dev imq1 root 2>/dev/null 1>&2
+
+#IMQ 0
+tc qdisc add dev imq0 root handle 1: htb default 20
+
+tc class add dev imq0 parent 1: classid 1:1 htb rate 2mbit burst 15k
+
+tc class add dev imq0 parent 1:1 classid 1:10 htb rate 1mbit
+tc class add dev imq0 parent 1:1 classid 1:20 htb rate 1mbit
+
+tc qdisc add dev imq0 parent 1:10 handle 10: pfifo
+tc qdisc add dev imq0 parent 1:20 handle 20: sfq
+
+tc filter add dev imq0 parent 1:0 protocol ip prio 1 u32 match ip dst 192.168.228.30 flowid 1:10
+
+iptables -t mangle -A PREROUTING -i eth0 -j IMQ --todev 0
+
+#IMQ 1
+tc qdisc add dev imq1 root handle 2: htb default 20
+
+tc class add dev imq1 parent 2: classid 2:1 htb rate 10mbit burst 15k
+
+tc class add dev imq1 parent 2:1 classid 2:10 htb rate 1mbit ceil 10mbit
+tc class add dev imq1 parent 2:1 classid 2:20 htb rate 1mbit ceil 10mbit
+
+tc qdisc add dev imq1 parent 2:10 handle 10: pfifo
+tc qdisc add dev imq1 parent 2:20 handle 20: sfq
+
+tc filter add dev imq1 parent 2:0 protocol ip prio 1 u32 match ip dst 192.168.228.30 flowid 2:10
+
+iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
+#+end_src
+** Advanced filters for (re-)classifying packets
+就象在分类的队列规定一段中解释的,过滤器用与把数据包分类并放入相应的子
+队列。这些过滤器在分类的队列规定内部被调用。
+
+下面就是我们可用的分类器(部分):
++ fw 根据防火墙如何对这个数据包做标记进行判断。
++ u32 根据数据包中的各个字段进行判断,如源 IP 地址等等。
++ route 根据数据包将被哪条路由进行路由来判断。
++ rsvp, rsvp6 根据数据包的 RSVP 情况进行判断
++ tcindex 用于 DSMARK 队列规定
++ protocol 这个分类器所接受的协议。
++ parent 这个分类器附带在哪个句柄上。句柄必须是一个已经存在的类
++ prio 这个分类器的优先权值。优先权值低的优先。
++ handle 对于不同过滤器,它的意义不同。
+*** The u32 classifier
+U32 分类器是当前实现中最先进的过滤器。全部基于哈希表实现,所以当有很多
+过滤器的时候仍然能够保持健壮。
+
+用来配置过滤器的 tc 命令行由三部分组成:过滤器说明、选择器和动作。一个
+过滤器可以如下定义:
+
+#+begin_src text
+tc filter add dev IF [ protocol PROTO ]
+                     [ (preference|priority) PRIO ]
+                     [ parent CBQ ]
+#+end_src
+**** U32 selector
+u32 选择器包含了能够对当前通过的数据包进行匹配的特征定义。它其实只是定
+义了 IP 包头中某些位的匹配而已,但这种看似简单的方法却非常有效。
+
+#+begin_src text
+# tc filter add dev eth0 protocol ip parent 1:0 pref 10 u32 \
+  match u32 00100000 00ff0000 at 0 flowid 1:10
+#+end_src
+**** General selectors
+一般选择器的语法是:
+#+begin_src c
+match [ u32 | u16 | u8 ] PATTERN MASK at [OFFSET | nexthdr+OFFSET]
+#+end_src
+** Examples
+*** 出口流限制
+#+begin_src sh
+ifconfig ath10 txqueuelen 32 up
+tc qdisc add dev ath10 handle 1: root htb
+tc class add dev ath10 parent 1: classid 1:1 htb rate 1000kbit mtu 10000
+tc filter add dev ath10 parent 1:0 prio 1 u32 match mark 25600 0xff00 classid 1:1
+ebtables -t nat -A POSTROUTING -o ath10 -j mark --mark-or 25600
+
+tc qdisc add dev ath10 parent 1:1 handle 2: htb
+tc class add dev ath10 parent 2: classid 2:1 htb rate 1000kbit ceil 1200kbit burst 1000kbit cburst 1000kbit mtu 10000
+
+tc filter add dev ath10 parent 2: prio 1 handle 800::800 u32 match u16 0x0800 0xffff at -2 match u32 0xb414701c 0xffffffff at -12 match u16 0xa088 0xffff at -14 flowid 2:1
+tc filter add dev ath10 parent 2: prio 1 handle 800::c00 u32 match u32 0xb414701c 0xffffffff at -20 match u16 0xa088 0xffff at -22 flowid 2:1
+#+end_src
+*** 入口流限制
+#+begin_src sh
+ifconfig imq0 txqueuelen 32 up
+tc qdisc add dev imq0 handle 1: root htb
+tc class add dev imq0 parent 1: classid 1:1 htb rate 2000kbit mtu 10000
+tc filter add dev imq0 parent 1:0 prio 1 u32 match mark 25600 0xff00 classid 1:1
+iptables -A PREROUTING -t mangle -m physdev --physdev-in ath10 -j MARK --or-mark 25600
+iptables -t mangle -A PREROUTING -m physdev --physdev-in ath10 -j IMQ --todev 0
+
+tc qdisc add dev imq0 parent 1:1 handle 2: htb
+tc class add dev imq0 parent 2: classid 2:1 htb rate 2000kbit ceil 2400kbit burst 1000kbit cburst 1000kbit mtu 10000
+
+tc filter add dev imq0 parent 2: prio 1 handle 800::800 u32 match u16 0x0800 0xffff at -2 match u16 0x701c 0xffff at -4 match u32 0xa088b414 0xffffffff at -8 flowid 2:1
+tc filter add dev imq0 parent 2: prio 1 handle 800::c00 u32 match u16 0x701c 0xffff at -12 match u32 0xa088b414 0xffffffff at -16 flowid 2:1
+#+end_src
+*** plain simple bandwidth sharing (aka traffic shaping) with HTB
+#+begin_src sh
+#!/bin/sh
+# We have 1000kbit upload and want to guarantee each user a certain amount of it.
+# If one user does not use its full quota, the unused quota get evenly distributed amongst the other users.
+ 
+# Variables
+IF_DSL=pppoe-dsl
+TC=$(which tc)
+IPT=$(which iptables)
+IPTMOD="$IPT -t mangle -A POSTROUTING -o $IF_DSL"
+IP_USER1=10.0.0.1
+IP_USER2=10.0.0.2
+IP_USER3=10.0.0.3
+IP_USER4=10.0.0.4
+ 
+insmod sch_htb
+ 
+$TC qdisc add dev $IF_DSL root       handle 1:    htb default 40
+$TC class add dev $IF_DSL parent 1:  classid 1:1  htb rate 1000kbit
+$TC class add dev $IF_DSL parent 1:1 classid 1:10 htb rate 250kbit #-- 25% to user1
+$TC class add dev $IF_DSL parent 1:1 classid 1:20 htb rate 250kbit #-- 25% to user2
+$TC class add dev $IF_DSL parent 1:1 classid 1:30 htb rate 350kbit #-- 35% to user3
+$TC class add dev $IF_DSL parent 1:1 classid 1:40 htb rate 150kbit #-- 15% to user4
+ 
+$IPTMOD -s $IP_USER1 -j CLASSIFY --set-class 1:10
+$IPTMOD -s $IP_USER2 -j CLASSIFY --set-class 1:20
+$IPTMOD -s $IP_USER3 -j CLASSIFY --set-class 1:30
+$IPTMOD -s $IP_USER4 -j CLASSIFY --set-class 1:40
+#+end_src
+* Kernel network parameters
+内核的网络有许多设置,可以参考如下:
+
++ [[http://www.lartc.org/lartc.html#AEN1492][Generic ipv4]]
++ [[http://www.lartc.org/lartc.html#AEN1673][Per device settings]]
++ [[http://www.lartc.org/lartc.html#AEN1730][Neighbor policy]]
++ [[http://www.lartc.org/lartc.html#AEN1782][Routing settings]]
+* More
+[[http://ebtables.netfilter.org/br_fw_ia/br_fw_ia.html][+ ebtalbes]]
++ [[http://www.tldp.org/HOWTO/html_single/Traffic-Control-HOWTO/][Traffic Control HOWTO]] represents the collection, amalgamation and
+  synthesis of the [[http://www.lartc.org/lartc.html#LARTC.QDISC.TERMINOLOGY][LARTC HOWTO]].
++ [[http://wiki.openwrt.org/doc/howto/packet.scheduler/packet.scheduler][Openwrt Network Traffic Control]]
++ [[https://github.com/frznlogic/iptables-tutorial][iptables-tutorial]]
++ [[https://github.com/frznlogic/ipsysctl-tutorial][ipsysctl-tutorial]]
+

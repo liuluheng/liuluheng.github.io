@@ -13,6 +13,7 @@
        + [[file:Algorithms/Theory of Algorithms/Fisher–Yates shuffle.org][Fisher–Yates shuffle]]
        + [[file:Algorithms/Theory of Algorithms/Hash table.org][Hash table]]
        + [[file:Algorithms/Theory of Algorithms/Knapsack problem.org][Knapsack problem]]
+       + [[file:Algorithms/Theory of Algorithms/dancing-links.org][Knuth's Algorithm X and Dancing Links]]
        + [[file:Algorithms/Theory of Algorithms/Longest common substring problem.org][Longest common substring problem]]
        + [[file:Algorithms/Theory of Algorithms/Longest palindromic substring.org][Longest palindromic substring]]
        + [[file:Algorithms/Theory of Algorithms/Misc.org][Misc]]
@@ -24,6 +25,7 @@
        + [[file:Algorithms/Theory of Algorithms/Subset sum problem.org][Subset sum problem]]
        + [[file:Algorithms/Theory of Algorithms/The Maximal Rectangle Problem.org][The Maximal Rectangle Problem]]
        + [[file:Algorithms/Theory of Algorithms/Tree.org][Tree]]
+       + [[file:Algorithms/Theory of Algorithms/k-d-tree.org][k-d tree]]
      + [[file:Algorithms/Advanced Data Structures.org][Advanced Data Structures]]
      + [[file:Algorithms/Algorithms FAQ.org][Algorithms FAQ]]
      + [[file:Algorithms/Algorithms Overview.org][Algorithms Overview]]
@@ -124,20 +126,26 @@
        + [[file:C-C++/C/C Overview.org][C Overview]]
        + [[file:C-C++/C/C Reserved Identifiers.org][C Reserved Identifiers]]
        + [[file:C-C++/C/C puzzles and faq.org][C puzzles and FAQ]]
+       + [[file:C-C++/C/time-programming-in-c.org][Time, Clock Programming in C]]
      + C++
+       + Effective-c++
+         + [[file:C-C++/C++/Effective-c++/Effective-C++-Notes.org][Effective C++ Notes]]
+         + [[file:C-C++/C++/Effective-c++/Effective-c++-1.org][Effective C++(Item 1-10)]]
        + [[file:C-C++/C++/Boost Notes.org][Boost Notes]]
+       + [[file:C-C++/C++/C++-delegate.org][C++ Delegate]]
        + [[file:C-C++/C++/C++ Overview.org][C++ Overview]]
        + [[file:C-C++/C++/C++ Reserved Identifiers.org][C++ Reserved Identifiers]]
+       + [[file:C-C++/C++/C++_Standard_Allocator.org][C++ Standard Allocator解析]]
        + [[file:C-C++/C++/C++ Standard Library.org][C++ Standard headers]]
        + [[file:C-C++/C++/C++_Templates_The Easy_Guide.org][C++ Templates: The Easy Guide]]
        + [[file:C-C++/C++/C++-network-programming.org][C++ network Programming]]
        + [[file:C-C++/C++/C++_profiler.org][C++ profiler]]
        + [[file:C-C++/C++/C++ puzzles and faq.org][C++ puzzles and FAQ]]
        + [[file:C-C++/C++/C++ static block.org][C++ static block]]
+       + [[file:C-C++/C++/C++11-features.org][C++11 New Features]]
        + [[file:C-C++/C++/C++11-atomic- operations.org][C++11 atomic operations]]
        + [[file:C-C++/C++/C++11- multithreading-programming.org][C++11 multithreading programming]]
        + [[file:C-C++/C++/C++测试驱动开发与单元测试实例.org][C++测试驱动开发与单元测试实例]]
-       + [[file:C-C++/C++/Effective-C++-Notes.org][Effective C++ Notes]]
        + [[file:C-C++/C++/Effective-STL-Notes.org][Effective STL Notes]]
        + [[file:C-C++/C++/Exceptional-C++-Notes.org][Exceptional C++ Notes]]
        + [[file:C-C++/C++/Google C++ Style Notes.org][Google C++ Style Guide Notes (Revision 3.274)]]
@@ -159,6 +167,11 @@
      + [[file:DSP/DSP Overview.org][DSP OverView]]
      + [[file:DSP/TI Manuals.org][TI Manuals]]
      + [[file:DSP/ TI emulation capabilities.org][TI emulation capabilities]]
+   + Data-Visualization
+     + Interactive Data Visualization for the Web
+       + [[file:Data-Visualization/Interactive Data Visualization for the Web/Interactive-Data-Visualization-for-the-Web.org][Interactive Data Visualization for the Web]]
+     + [[file:Data-Visualization/Data-Visualization-Overview.org][Data Visualization Overview]]
+     + [[file:Data-Visualization/d3-js.org][d3.js]]
    + DataBase
      + [[file:DataBase/Database-overview.org][Database Overview]]
    + Emacs
@@ -241,7 +254,7 @@
    + Linux
      + Networks
        + [[file:Linux/Networks/application-layer.org][Application Layer]]
-       + [[file:Linux/Networks/netfilter.org][Linux Netfilter]]
+       + [[file:Linux/Networks/netfilter.org][Linux Netfilter and Traffic Control]]
        + [[file:Linux/Networks/nework-access-layer.org][Linux network and Network access layer]]
        + [[file:Linux/Networks/network-layer.org][Network layer]]
        + [[file:Linux/Networks/transport-layer.org][Transport layer]]
@@ -249,6 +262,8 @@
      + Ubuntu
        + [[file:Linux/Ubuntu/dell-m4800-install-ubuntu.org][Dell M4800 install ubuntu 14.04]]
        + [[file:Linux/Ubuntu/Optimize-SSD-for-Ubuntu-14.04.org][Optimize SSD for Ubuntu 14.04]]
+     + Windows
+       + [[file:Linux/Windows/restore-windows-or-ubuntu.org][Restore windows MBR or ubuntu grub]]
      + [[file:Linux/Filesystem Hierarchy Standard.org][Filesystem Hierarchy Standard]]
      + [[file:Linux/Google Shell Style Notes.org][Google Shell Style Notes (Revision 1.26)]]
      + [[file:Linux/Linux Command Sheet.org][Linux Command Sheet]]
@@ -258,7 +273,17 @@
      + [[file:Linux/Socket Overview.org][Socket Overview]]
      + [[file:Linux/Tiling Window Managers.org][Tiling Window Managers]]
      + [[file:Linux/zsh与oh-my-zsh.org][Zsh]]
+     + [[file:Linux/meminfo.org][meminfo]]
      + [[file:Linux/pkg-config.org][pkg-config Notes]]
+   + Machine-Learning
+     + Theory
+       + [[file:Machine-Learning/Theory/hidden-markov-model.org][Hidden Markov model]]
+     + Tutorial
+       + [[file:Machine-Learning/Tutorial/Machine-Learning从零开始.org][Machine Learning从零开始]]
+       + [[file:Machine-Learning/Tutorial/Machine-Learning从零开始一.org][Machine Learning从零开始一]]
+     + [[file:Machine-Learning/Deep-Learning.org][Deep Learning]]
+     + [[file:Machine-Learning/Machine-Learning.org][Machine Learning]]
+     + [[file:Machine-Learning/statistical-learning.org][Statistical Learning]]
    + Misc
      + Data
        + [[file:Misc/Data/Data Overview.org][Data Overview]]
@@ -280,11 +305,6 @@
        + [[file:Misc/Mac/Software.org][Software]]
        + [[file:Misc/Mac/Sublime Text.org][Sublime Text]]
        + [[file:Misc/Mac/TextMate Sheet.org][TextMate Sheet]]
-     + Machine Learning
-       + [[file:Misc/Machine Learning/Deep Learning.org][Deep Learning]]
-       + [[file:Misc/Machine Learning/Machine Learning.org][Machine Learning]]
-       + [[file:Misc/Machine Learning/Machine-Learning从零开始.org][Machine Learning从零开始]]
-       + [[file:Misc/Machine Learning/Machine-Learning从零开始一.org][Machine Learning从零开始一]]
      + Math
        + [[file:Misc/Math/Math Summarize.org][Math Summarize]]
      + Misc Notes
@@ -332,8 +352,10 @@
        + [[file:Mobile/Android/Nexus 4 mako.org][Nexus 4 mako]]
        + [[file:Mobile/Android/Phone Sensing.org][Phone Sensing]]
    + Python
+     + ipython
+       + [[file:Python/ipython/Rich-Output-of-IPython.org][Rich Output of IPython]]
      + matplotlib
-       + [[file:Python/matplotlib/matplotlib.org][]]
+       + [[file:Python/matplotlib/matplotlib.org][matplotlib]]
      + numpy
        + [[file:Python/numpy/numpy.org][numpy]]
      + pandas
@@ -371,20 +393,21 @@
      + Operating System
        + [[file:Software Engineering/Operating System/Operating-system.org][Operating System]]
      + Test
-       + [[file:Software Engineering/Test/Robot Framework.org][Robot Framework Test]]
+       + [[file:Software Engineering/Test/Robot-Framework.org][Robot Framework Test]]
        + [[file:Software Engineering/Test/Test Automation.org][Test Automation]]
      + git
-       + [[file:Software Engineering/git/Fork a Repo and fetch.org][Fork a Repo and fetch]]
-       + [[file:Software Engineering/git/Git and GitHub overview.org][Git and Github Overview]]
+       + [[file:Software Engineering/git/Fork-a-Repo-and-fetch.org][Fork a Repo and fetch]]
+       + [[file:Software Engineering/git/Git-and-GitHub-overview.org][Git and Github Overview]]
        + [[file:Software Engineering/git/git.org][git command]]
      + [[file:Software Engineering/AutoMake Notes.org][AutoMake Notes]]
      + [[file:Software Engineering/CMake_Notes.org][CMake Notes]]
      + [[file:Software Engineering/Codes sites.org][Codes Sites]]
-     + [[file:Software Engineering/Learn regular expressions the easy way.org][Learn regular expression the easy way]]
+     + [[file:Software Engineering/Learn-regular-expressions-the-easy-way.org][Learn regular expression the easy way]]
      + [[file:Software Engineering/Make Notes.org][Make Notes]]
      + [[file:Software Engineering/Projects in Github.org][Projects in Github]]
      + [[file:Software Engineering/Software Engineering Things.org][Software Engineering Things]]
      + [[file:Software Engineering/UML.org][UML相关工具一览]]
+     + [[file:Software Engineering/vagrant.org][Vagrant]]
      + [[file:Software Engineering/Web Server.org][Web Server]]
    + Web
      + Bootstrap
@@ -394,13 +417,14 @@
        + [[file:Web/Django/Django-things.org][Django Things]]
      + HTML CSS
        + [[file:Web/HTML CSS/CSS.org][CSS]]
-       + [[file:Web/HTML CSS/Google HTML CSS Style Notes.org][Google HTML/CSS Style Notes]]
-       + [[file:Web/HTML CSS/HTML Notes.org][HTML Notes]]
+       + [[file:Web/HTML CSS/Google-HTML-CSS-Style-Notes.org][Google HTML/CSS Style Notes]]
+       + [[file:Web/HTML CSS/HTML-Notes.org][HTML Notes]]
      + JSON
        + [[file:Web/JSON/Google JSON Style Notes.org][Google JSON Style Notes]]
      + JavaScript
        + [[file:Web/JavaScript/AngularJS.org][AngularJS]]
        + [[file:Web/JavaScript/Google JavaScript Style Notes.org][Google JavaScript Style Notes]]
+       + [[file:Web/JavaScript/javascript.org][Javascript]]
        + [[file:Web/JavaScript/angularjs-style-guide.org][John Papa's AngularJS Style Guide]]
        + [[file:Web/JavaScript/insert-qq-map.org][网页内嵌入腾讯地图]]
      + Node_js

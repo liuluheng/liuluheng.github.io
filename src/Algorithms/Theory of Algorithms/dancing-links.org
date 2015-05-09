@@ -1,0 +1,82 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Knuth's Algorithm X and Dancing Links
+#+OPTIONS: num:nil H:2
+
+
+* Knuth's Algorithm X
+[[http://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X][Knuth's Algorithm X]] 是一个递归回朔的算法,用来找出由0和1组成的矩阵A的涵
+盖问题的所有解.目的是找到行的子集,那么在每列出现数字1仅一次.如下例子的
+A和它的解:
+
+[[./files/algorithm_x_matreix_a.jpeg]]  [[./files/algorithm_x_solution.jpeg]]
+
+Algorithm X的算法流程如下:
+#+begin_src text
+  1. If the matrix A has no columns, the current partial solution is a valid solution; terminate successfully.
+  2. Otherwise choose a column c (deterministically).
+  3. Choose a row r such that Ar, c = 1 (nondeterministically).
+  4. Include row r in the partial solution.
+  5. For each column j such that Ar, j = 1,
+         for each row i such that Ai, j = 1,
+             delete row i from matrix A;
+         delete column j from matrix A.
+  6. Repeat this algorithm recursively on the reduced matrix A.
+#+end_src
+
+如下的Dancing Links由Knuth建议有效实现Algorithm X.更多细节见Knuth的原
+文[[./files/dancing-links.pdf][Dancing links]].
+
+* Implement Dancing Links
+[[http://en.wikipedia.org/wiki/Dancing_Links][Dancing Links]]的主要结构如下,使用4链表形式:
+[[./files/four-way-linked.jpeg]]
+
+主要操作是把节点x移除矩阵或恢复节点x,删除列的操作如下(行的操作把left和
+right换成up和down即可):
+#+begin_src text
+# remove node x
+x.left.right ← x.right;
+x.right.left ← x.left;
+# restore x
+x.left.right ← x;
+x.right.left ← x;
+#+end_src
+
+[[./files/covered-links.jpeg]]
+
+具体实现代码
+#+begin_src c++
+
+#+end_src
+
+* Applications
+利用Algorithm X能解决很多cover问题,这里以[[https://en.wikipedia.org/wiki/Sudoku][ sudoku]] 和 [[http://en.wikipedia.org/wiki/Polyomino][Polyonimo]] 为例.
+** Sudoku
+需要创建一个Sudoku的矩阵才能把这个问题转换成Exact Cover问题,我们需要构
+造出行和列分别表示什么.
+
+*列* 表示这个谜题的限制,一共有4个:
+1. 位置限制:一格仅有一个数.
+2. 列限制:在列中每个数仅出现一次.
+3. 行限制:在行中每个数仅出现一次.
+4. 区域限制:每个区域每个数仅出现一次.
+
+所以列的大小是 size^2*4 (size是Sudoku的总行数或总列数)
+
+*行* 表示每个数放入每格中.大小是 size^3.
+
+以最简单的2*2为例,并且把格(1,1)和(1,2)归为区域1.
+
+[[./files/sudoku-2-2-example.jpeg]]
+
+利用Algorithm X解出其中一个解为:
+[[./files/sudoku-2-2-solution.jpeg]]
+
+关于更多[[http://garethrees.org/2007/06/10/zendoku-generation/#section-5][ 难度划分]] 和 [[http://www.sadmansoftware.com/sudoku/solvingtechniques.htm][策略]].
+** Polyonimo
+如上同样创建一个Polyonimo的矩阵.
+
++ *列* 表示每个格子.
++ *行* 表示每个多边形放入每个格子.
+
+如下的问题和解答:
+[[./files/polyonimo.jpeg]]
